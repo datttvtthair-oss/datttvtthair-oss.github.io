@@ -27,7 +27,7 @@
   const STAND_Y = L.ankleH + L.shank + L.thigh; // 0.955 — số đo khớp khớp với khung người trong js/data/body.js
 
   const COLORS = {
-    bg: 0x2a2d32, floor: 0x2b2e33, body: 0xd5d8dd, hot: 0xff4a1c, hotGlow: 0xff2a0a, warm: 0xff9c66, shorts: 0x15171b, rimBlue: 0x7cc8ff,
+    bg: 0x2a2d32, floor: 0x2b2e33, body: 0xc4c8ce, hot: 0xff4a1c, hotGlow: 0xff2a0a, warm: 0xff9c66, shorts: 0x15171b, rimBlue: 0x7cc8ff,
     sole: 0xff8a3d, steel: 0x3b4250, dark: 0x1b1f26, pad: 0x262a32, plate: 0x0e1013, chrome: 0xb9c2cf,
     ball: 0xe46a1f, rim: 0xff5a1f, cable: 0xd6dde6, mat: 0x23272e
   };
@@ -172,6 +172,7 @@
     g.setAttribute('mus', new T.BufferAttribute(Float32Array.from(dec(M.mus)), 2)); // 2 nhóm cơ mạnh nhất ở mỗi đỉnh
     g.setAttribute('mInt', new T.BufferAttribute(f01(M.mInt), 2));
     g.setAttribute('shorts', new T.BufferAttribute(f01(M.shorts), 1));
+    g.setAttribute('ao', M.ao ? new T.BufferAttribute(f01(M.ao), 1) : new T.BufferAttribute(new Float32Array(M.n).fill(1), 1)); // bóng trong khe cơ
     g.computeVertexNormals();
     const R = {}; Object.keys(M.rest).forEach(k => { R[k] = V(...M.rest[k]); });
     // khung xương lúc nghỉ (gốc, trục dọc y, trục trước z) → lưu nghịch đảo
@@ -206,11 +207,11 @@
   }
 
   function bodyMaterial(levels, U) {
-    const m = new T.MeshStandardMaterial({ color: COLORS.body, roughness: 0.5, metalness: 0.0, envMapIntensity: 0.9 });
+    const m = new T.MeshStandardMaterial({ color: COLORS.body, roughness: 0.46, metalness: 0.0, envMapIntensity: 0.8 });
     m.onBeforeCompile = sh => {
       sh.uniforms.uLvl = { value: levels };
       sh.uniforms.uGlow = U.glow;
-      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float shorts;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\n' +
+      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float shorts;\nattribute float ao;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\n' +
         sh.vertexShader.replace('#include <begin_vertex>', [
           '#include <begin_vertex>',
           '  int m1 = int(mus.x + 0.5); int m2 = int(mus.y + 0.5);',
@@ -219,16 +220,19 @@
           '  vHot = clamp((l1 > 0.75 ? mInt.x : 0.0) + (l2 > 0.75 ? mInt.y : 0.0), 0.0, 1.0);',
           '  vWarm = clamp((l1 > 0.25 && l1 < 0.75 ? mInt.x : 0.0) + (l2 > 0.25 && l2 < 0.75 ? mInt.y : 0.0), 0.0, 1.0);',
           '  vShorts = shorts;',
+          '  vAO = ao;',
           '  transformed += objectNormal * (vHot * uGlow * 0.004);'].join('\n'));
-      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\n' +
+      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\n' +
         sh.fragmentShader
           .replace('#include <color_fragment>', [
             '#include <color_fragment>',
+            '  diffuseColor.rgb *= mix(1.0, vAO, 0.65);',
             '  float hotK = smoothstep(0.0, 0.5, vHot);',
             '  vec3 hotC = mix(vec3(0.8, 0.07, 0.02), vec3(1.0, 0.24, 0.05), smoothstep(0.45, 1.0, vHot));',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, hotC, hotK);',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.6, 0.38), smoothstep(0.0, 0.6, vWarm) * 0.7);',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.045, 0.047, 0.052), vec3(0.34, 0.04, 0.02), hotK * 0.45), vShorts);'].join('\n'))
+          .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  reflectedLight.indirectDiffuse *= vAO;\n  reflectedLight.indirectSpecular *= vAO * vAO;')
           .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.85, vShorts);')
           .replace('#include <emissivemap_fragment>', [
             '#include <emissivemap_fragment>',
@@ -237,7 +241,7 @@
             '  totalEmissiveRadiance += vec3(1.0, 0.13, 0.02) * smoothstep(0.0, 0.5, vHot) * (0.3 + 0.75 * uGlow) * (1.0 - 0.8 * vShorts);',
             '  totalEmissiveRadiance += vec3(1.0, 0.4, 0.15) * smoothstep(0.0, 0.6, vWarm) * 0.1;'].join('\n'));
     };
-    m.customProgramCacheKey = () => 'togi-body-2';
+    m.customProgramCacheKey = () => 'togi-body-3';
     return m;
   }
 
@@ -557,8 +561,8 @@
     };
     panel(7, 5, [3.5, 7, 6], 0xffffff, 3.2);     // hộp đèn chính
     panel(5, 3, [-6, 3, 4], 0xf1f4ff, 1.1);      // đèn phụ
-    panel(3, 8, [-6, 4, -5], 0x9cc8ff, 2.6);     // viền xanh trái-sau
-    panel(3, 8, [6, 4, -5], 0x9cc8ff, 1.8);      // viền xanh phải-sau
+    panel(3, 8, [-6, 4, -5], 0xb4d4ff, 1.5);     // viền xanh trái-sau
+    panel(3, 8, [6, 4, -5], 0xb4d4ff, 1.0);      // viền xanh phải-sau
     panel(30, 30, [0, -0.5, 0], 0x3a3d43, 1.0);  // sàn hắt
     const pm = new T.PMREMGenerator(renderer);
     const rt = pm.fromScene(env, 0.035);
@@ -603,7 +607,7 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.outputEncoding = T.sRGBEncoding;
-    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.98;
     stage.appendChild(renderer.domElement);
     const scene = new T.Scene();
     scene.background = studioBg();
@@ -611,16 +615,16 @@
     const envTex = studioEnv(renderer);
     scene.environment = envTex;
     const cam = new T.PerspectiveCamera(32, 16 / 9, 0.05, 50);
-    scene.add(new T.HemisphereLight(0xe4ebf5, 0x2a2c30, 0.22));
-    const sun = new T.DirectionalLight(0xfffaf3, 0.95);
+    scene.add(new T.HemisphereLight(0xe4ebf5, 0x2a2c30, 0.14));
+    const sun = new T.DirectionalLight(0xfffaf3, 1.2);
     sun.position.set(2.2, 5, 3.8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.radius = 5; sun.shadow.bias = -0.0004;
     Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 15 });
     scene.add(sun);
-    const rim = new T.DirectionalLight(0xa9cfff, 0.7); rim.position.set(-3, 3, -3.5); scene.add(rim);
-    const rim2 = new T.DirectionalLight(0xa9cfff, 0.45); rim2.position.set(3.5, 2, -2.5); scene.add(rim2);
+    const rim = new T.DirectionalLight(0xa9cfff, 0.4); rim.position.set(-3, 3, -3.5); scene.add(rim);
+    const rim2 = new T.DirectionalLight(0xa9cfff, 0.25); rim2.position.set(3.5, 2, -2.5); scene.add(rim2);
     // sàn studio: cùng tông với nền, chỉ hiện bóng đổ mềm
     const floor = new T.Mesh(new T.PlaneGeometry(80, 80), mat(COLORS.floor, { roughness: 0.95, metalness: 0 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
