@@ -14,21 +14,22 @@
 (function () {
   'use strict';
   const T = window.THREE;
+  if (!T) { window.Anim3D = { define() {}, has: () => false, mount: () => null, muscles() {}, list: () => [] }; return; }
   if (T && T.ColorManagement) T.ColorManagement.legacyMode = false; // màu hex hiểu là sRGB → không bị bạc
   const DEG = Math.PI / 180;
   const V = (x, y, z) => new T.Vector3(x, y, z);
 
   /* Kích thước cơ thể (~1,72 m) */
   const L = {
-    ankleH: 0.085, shank: 0.43, thigh: 0.44, hip: 0.095, spine: 0.47,
-    sh: 0.185, shDrop: 0.045, neck: 0.085, headR: 0.105, upper: 0.29, fore: 0.255
+    ankleH: 0.071, shank: 0.444, thigh: 0.44, hip: 0.107, spine: 0.509,
+    sh: 0.188, shDrop: 0.045, neck: 0.061, headR: 0.105, upper: 0.27, fore: 0.26
   };
-  const STAND_Y = L.ankleH + L.shank + L.thigh; // 0.955
+  const STAND_Y = L.ankleH + L.shank + L.thigh; // 0.955 — số đo khớp khớp với khung người trong js/data/body.js
 
   const COLORS = {
-    bg: 0x0b1630, floor: 0x10203f, grid: 0x22d3ee, skin: 0xe6c4a8, shirt: 0x1ba6c2, shorts: 0x14284d,
-    shoe: 0xf2f5fa, sole: 0xff8a3d, focus: 0xff8a3d, steel: 0x5b6b85, dark: 0x1e293b, pad: 0x273449,
-    plate: 0x111827, chrome: 0xcbd5e1, ball: 0xe46a1f, rim: 0xff5a1f, cable: 0xe2e8f0, mat: 0x1f6f78
+    bg: 0x2a2d32, floor: 0x2b2e33, body: 0xd5d8dd, hot: 0xff4a1c, hotGlow: 0xff2a0a, warm: 0xff9c66, shorts: 0x15171b, rimBlue: 0x7cc8ff,
+    sole: 0xff8a3d, steel: 0x3b4250, dark: 0x1b1f26, pad: 0x262a32, plate: 0x0e1013, chrome: 0xb9c2cf,
+    ball: 0xe46a1f, rim: 0xff5a1f, cable: 0xd6dde6, mat: 0x23272e
   };
 
   /* ── tiện ích hình học ── */
@@ -77,7 +78,7 @@
       const ank = V(...p['a' + s]);
       const kp = p['k' + s] ? V(...p['k' + s]) : fwd.clone().setY(0).normalize().add(V(0.15 * sign, 0, 0));
       const leg = ik(J['hip' + s], ank, L.thigh, L.shank, kp);
-      J['knee' + s] = leg.mid; J['ank' + s] = leg.end;
+      J['knee' + s] = leg.mid; J['ank' + s] = leg.end; J['kp' + s] = kp.clone();
       J['heel' + s] = leg.end.clone().add(fwd.clone().multiplyScalar(-0.05)).add(down.clone().multiplyScalar(0.05));
       J['toe' + s] = leg.end.clone().add(fwd.clone().multiplyScalar(0.16)).add(down.clone().multiplyScalar(0.055));
       // cổ tay: toạ độ thế giới (wL) hoặc theo thân (wLt, gốc ở điểm ngực, trục theo thân)
@@ -87,7 +88,7 @@
       const ep = p['e' + s + 't'] ? V(...p['e' + s + 't']).applyQuaternion(qb)
         : p['e' + s] ? V(...p['e' + s]) : V(0.35 * sign, -1, -0.35);
       const arm = ik(J['sh' + s], wr, L.upper, L.fore, ep);
-      J['elb' + s] = arm.mid; J['wr' + s] = arm.end;
+      J['elb' + s] = arm.mid; J['wr' + s] = arm.end; J['ep' + s] = ep.clone();
       const fd = arm.end.clone().sub(arm.mid).normalize();
       J['hand' + s] = arm.end.clone().add(fd.clone().multiplyScalar(0.055));
       J['fdir' + s] = fd;
@@ -132,69 +133,229 @@
     mesh.scale.set(1, len, 1);
   }
 
-  function makeBody(scene, focus) {
-    const F = new Set(focus || []);
-    const skin = mat(COLORS.skin), shirt = mat(COLORS.shirt), shorts = mat(COLORS.shorts), shoe = mat(COLORS.shoe), sole = mat(COLORS.sole);
-    const hot = mat(COLORS.focus, { emissive: COLORS.focus, emissiveIntensity: 0.28 });
-    const pick = (part, base) => (F.has(part) ? hot : base);
-    const cyl = (rt, rb, m) => { const g = new T.CylinderGeometry(rt, rb, 1, 18); const me = new T.Mesh(g, m); me.castShadow = true; scene.add(me); return me; };
-    const sph = (r, m) => { const me = new T.Mesh(new T.SphereGeometry(r, 20, 14), m); me.castShadow = true; scene.add(me); return me; };
-    const B = {};
-    for (const s of ['L', 'R']) {
-      B['thigh' + s] = cyl(0.056, 0.078, pick('thigh', shorts));
-      B['shank' + s] = cyl(0.042, 0.056, pick('calf', skin));
-      B['knee' + s] = sph(0.056, pick('thigh', skin));
-      B['ank' + s] = sph(0.042, skin);
-      B['foot' + s] = cyl(0.04, 0.045, shoe);
-      B['sole' + s] = cyl(0.043, 0.043, sole);
-      B['upper' + s] = cyl(0.04, 0.05, pick('arm', skin));
-      B['fore' + s] = cyl(0.032, 0.04, pick('forearm', skin));
-      B['shJ' + s] = sph(0.062, pick('shoulder', shirt));
-      B['elb' + s] = sph(0.04, pick('arm', skin));
-      B['hand' + s] = sph(0.045, skin);
+  /* ── người mẫu: khung người MakeHuman (CC0) da trắng mịn, đầu trơn không mặt, quần short đen;
+        nhóm cơ đang tập phát sáng đỏ/cam, viền sáng xanh — js/data/body.js do tools/build-body.py tạo ── */
+  const MUSCLES = ['chest', 'delts_front', 'delts_side', 'delts_rear', 'traps', 'midback', 'lats', 'lower_back', 'abs', 'obliques',
+    'biceps', 'triceps', 'forearms', 'glutes', 'quads', 'hamstrings', 'adductors', 'calves'];
+
+  // ma trận khung: gốc o, trục y theo y, trục z gần zref
+  function basis(o, y, zref, out) {
+    const yy = y.clone().normalize();
+    let z = zref.clone().sub(yy.clone().multiplyScalar(zref.dot(yy)));
+    if (z.lengthSq() < 1e-8) { z = Math.abs(yy.z) < 0.9 ? V(0, 0, 1) : V(1, 0, 0); z.sub(yy.clone().multiplyScalar(z.dot(yy))); }
+    z.normalize();
+    const x = V().crossVectors(yy, z);
+    return (out || new T.Matrix4()).makeBasis(x, yy, z).setPosition(o);
+  }
+  const perp = (v, u) => v.clone().sub(u.clone().multiplyScalar(v.dot(u))).normalize();
+
+  let BODY = null; // hình học + khung nghỉ, dựng một lần
+  function bodyData() {
+    if (BODY) return BODY;
+    const M = window.BODY_MESH;
+    if (!M) return null;
+    const dec = s => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+    const q = new Int16Array(dec(M.pos).buffer);
+    const pos = new Float32Array(M.n * 3);
+    for (let i = 0; i < pos.length; i++) { const k = i % 3; pos[i] = M.posMin[k] + (q[i] + 32767) * M.posScale[k]; }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(pos, 3));
+    g.setIndex(new T.BufferAttribute(new Uint16Array(dec(M.idx).buffer), 1));
+    g.setAttribute('skinIndex', new T.Uint16BufferAttribute(Uint16Array.from(dec(M.skI)), 4));
+    const sw = dec(M.skW), w = new Float32Array(sw.length);
+    for (let i = 0; i < sw.length; i += 4) {
+      const s = (sw[i] + sw[i + 1] + sw[i + 2] + sw[i + 3]) || 1;
+      for (let j = 0; j < 4; j++) w[i + j] = sw[i + j] / s;
     }
-    B.hips = sph(1, pick('glute', shorts)); B.hips.scale.set(0.165, 0.115, 0.12);
-    B.abs = sph(1, pick('core', shirt));
-    B.chest = sph(1, pick(F.has('chest') ? 'chest' : 'back', shirt));
-    B.neck = cyl(0.045, 0.05, skin);
-    B.head = sph(L.headR, skin);
-    B.nose = sph(0.022, skin);
-    B.hair = sph(L.headR * 1.02, mat(0x1b1b1f));
-    return B;
+    g.setAttribute('skinWeight', new T.BufferAttribute(w, 4));
+    const f01 = s => Float32Array.from(dec(s), v => v / 255);
+    g.setAttribute('mus', new T.BufferAttribute(Float32Array.from(dec(M.mus)), 2)); // 2 nhóm cơ mạnh nhất ở mỗi đỉnh
+    g.setAttribute('mInt', new T.BufferAttribute(f01(M.mInt), 2));
+    g.setAttribute('shorts', new T.BufferAttribute(f01(M.shorts), 1));
+    g.computeVertexNormals();
+    const R = {}; Object.keys(M.rest).forEach(k => { R[k] = V(...M.rest[k]); });
+    // khung xương lúc nghỉ (gốc, trục dọc y, trục trước z) → lưu nghịch đảo
+    const F0 = {}, len0 = {};
+    const inv = m => m.clone().invert();
+    F0.hips = inv(new T.Matrix4().setPosition(R.pel));
+    F0.chest = inv(new T.Matrix4().setPosition(R.mid));
+    F0.head = inv(new T.Matrix4().setPosition(R.neck));
+    for (const s of ['L', 'R']) {
+      const sh = R['sh' + s], el = R['elb' + s], wr = R['wr' + s];
+      const uA = el.clone().sub(sh), uF = wr.clone().sub(el);
+      const sw2 = wr.clone().sub(sh).normalize();
+      const ep = el.clone().sub(sh).sub(sw2.clone().multiplyScalar(el.clone().sub(sh).dot(sw2)));
+      const frA = perp(ep.clone().negate(), uA.clone().normalize());
+      F0['up' + s] = inv(basis(sh, uA, frA)); len0['up' + s] = uA.length();
+      F0['upRot' + s] = new T.Quaternion().setFromRotationMatrix(basis(V(0, 0, 0), uA, frA));
+      const foB = basis(el, uF, perp(frA, uF.clone().normalize()));
+      F0['fo' + s] = inv(foB); len0['fo' + s] = uF.length();
+      F0['foRot' + s] = new T.Quaternion().setFromRotationMatrix(foB);
+      const hp = R['hip' + s], kn = R['knee' + s], an = R['ank' + s];
+      const uT = kn.clone().sub(hp), uS = an.clone().sub(kn);
+      F0['th' + s] = inv(basis(hp, uT, V(0, 0, 1))); len0['th' + s] = uT.length();
+      F0['sk' + s] = inv(basis(kn, uS, V(0, 0, 1))); len0['sk' + s] = uS.length();
+      const fw = R['toe' + s].clone().sub(an); fw.y = 0;
+      F0['ft' + s] = inv(basis(an, fw, V(0, 1, 0)));
+      F0['dl' + s] = new T.Matrix4().setPosition(sh.clone().negate());
+    }
+    const H = {};
+    ['L', 'R'].forEach(s => { H[s] = { grip: V(...M.hand[s].grip), pn: V(...M.hand[s].pn).normalize() }; });
+    BODY = { geo: g, R, F0, len0, H, names: M.bones.map(n => n.replace(/^sh([LR])$/, 'sk$1')) };
+    return BODY;
   }
 
-  function updateBody(B, J) {
+  function bodyMaterial(levels, U) {
+    const m = new T.MeshStandardMaterial({ color: COLORS.body, roughness: 0.5, metalness: 0.0, envMapIntensity: 0.9 });
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uLvl = { value: levels };
+      sh.uniforms.uGlow = U.glow;
+      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float shorts;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\n' +
+        sh.vertexShader.replace('#include <begin_vertex>', [
+          '#include <begin_vertex>',
+          '  int m1 = int(mus.x + 0.5); int m2 = int(mus.y + 0.5);',
+          '  float l1 = 0.0; float l2 = 0.0;',
+          '  for (int i = 0; i < 18; i++) { if (i == m1) l1 = uLvl[i]; if (i == m2) l2 = uLvl[i]; }',
+          '  vHot = clamp((l1 > 0.75 ? mInt.x : 0.0) + (l2 > 0.75 ? mInt.y : 0.0), 0.0, 1.0);',
+          '  vWarm = clamp((l1 > 0.25 && l1 < 0.75 ? mInt.x : 0.0) + (l2 > 0.25 && l2 < 0.75 ? mInt.y : 0.0), 0.0, 1.0);',
+          '  vShorts = shorts;',
+          '  transformed += objectNormal * (vHot * uGlow * 0.004);'].join('\n'));
+      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\n' +
+        sh.fragmentShader
+          .replace('#include <color_fragment>', [
+            '#include <color_fragment>',
+            '  float hotK = smoothstep(0.0, 0.5, vHot);',
+            '  vec3 hotC = mix(vec3(0.8, 0.07, 0.02), vec3(1.0, 0.24, 0.05), smoothstep(0.45, 1.0, vHot));',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, hotC, hotK);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.6, 0.38), smoothstep(0.0, 0.6, vWarm) * 0.7);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.045, 0.047, 0.052), vec3(0.34, 0.04, 0.02), hotK * 0.45), vShorts);'].join('\n'))
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.85, vShorts);')
+          .replace('#include <emissivemap_fragment>', [
+            '#include <emissivemap_fragment>',
+            '  float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);',
+            '  totalEmissiveRadiance += vec3(0.42, 0.66, 1.0) * rimF * (0.5 - 0.38 * vShorts);',
+            '  totalEmissiveRadiance += vec3(1.0, 0.13, 0.02) * smoothstep(0.0, 0.5, vHot) * (0.3 + 0.75 * uGlow) * (1.0 - 0.8 * vShorts);',
+            '  totalEmissiveRadiance += vec3(1.0, 0.4, 0.15) * smoothstep(0.0, 0.6, vWarm) * 0.1;'].join('\n'));
+    };
+    m.customProgramCacheKey = () => 'togi-body-2';
+    return m;
+  }
+
+  // hướng lòng bàn tay mong muốn: 'sup' = ngửa về phía gập khuỷu, 'pro' = úp ngược lại,
+  // hoặc [vào trong, lên, ra trước] theo thân người (vào trong = về phía giữa người)
+  function palmTarget(spec, s, J, z0) {
+    if (spec === 'sup') return z0.clone();
+    if (spec === 'pro') return z0.clone().negate();
+    const sg = s === 'L' ? 1 : -1;
+    return V(-sg * spec[0], spec[1], spec[2]).applyQuaternion(J.qb);
+  }
+
+  function makeBody(scene, def) {
+    const D = bodyData();
+    if (!D) return null;
+    const lv = MUSCLES.map(m => (def.focus || []).includes(m) ? 1 : (def.assist || []).includes(m) ? 0.5 : 0);
+    const U = { glow: { value: 0.3 } };
+    const bones = D.names.map(() => { const b = new T.Bone(); b.matrixAutoUpdate = false; return b; });
+    const skel = new T.Skeleton(bones, bones.map(() => new T.Matrix4()));
+    const mesh = new T.SkinnedMesh(D.geo, bodyMaterial(lv, U));
+    mesh.bind(skel, new T.Matrix4());
+    mesh.frustumCulled = false; mesh.castShadow = true;
+    scene.add(mesh);
+    const idx = {}; D.names.forEach((n, i) => { idx[n] = bones[i]; });
+    return { mesh, bones: idx, U, D, palm: def.palm || null };
+  }
+
+  const _F = new T.Matrix4(), _S = new T.Matrix4(), _Q = new T.Quaternion();
+  function setBone(b, F1, k, F0inv) {
+    _S.makeScale(1, k, 1);
+    b.matrixWorld.copy(F1).multiply(_S).multiply(F0inv);
+  }
+
+  function updateBody(B, J, glow, pose) {
+    const { D, bones } = B, F0 = D.F0;
+    setBone(bones.hips, _F.makeRotationFromQuaternion(J.q).setPosition(J.pel), 1, F0.hips);
+    setBone(bones.chest, _F.makeRotationFromQuaternion(J.qb).setPosition(J.mid), (L.spine / 2) / (D.R.chest.y - D.R.mid.y), F0.chest);
+    setBone(bones.head, _F.makeRotationFromQuaternion(J.qh).setPosition(J.neck), 1, F0.head);
     for (const s of ['L', 'R']) {
-      placeBetween(B['thigh' + s], J['knee' + s], J['hip' + s]);
-      placeBetween(B['shank' + s], J['ank' + s], J['knee' + s]);
-      B['knee' + s].position.copy(J['knee' + s]);
-      B['ank' + s].position.copy(J['ank' + s]);
-      placeBetween(B['foot' + s], J['heel' + s], J['toe' + s]);
-      const down = J['toe' + s].clone().sub(J['heel' + s]).normalize();
-      const off = V(0, -0.03, 0);
-      placeBetween(B['sole' + s], J['heel' + s].clone().add(off), J['toe' + s].clone().add(off));
-      B['sole' + s].scale.x = B['sole' + s].scale.z = 1.05;
-      void down;
-      placeBetween(B['upper' + s], J['elb' + s], J['sh' + s]);
-      placeBetween(B['fore' + s], J['wr' + s], J['elb' + s]);
-      B['shJ' + s].position.copy(J['sh' + s]);
-      B['elb' + s].position.copy(J['elb' + s]);
-      B['hand' + s].position.copy(J['hand' + s]);
+      const sh = J['sh' + s], el = J['elb' + s], wr = J['wr' + s];
+      const uA = el.clone().sub(sh), uF = wr.clone().sub(el), uFn = uF.clone().normalize();
+      const frA = perp(J['ep' + s].clone().negate(), uA.clone().normalize());
+      basis(sh, uA, frA, _F);
+      const upQ = _Q.setFromRotationMatrix(_F).multiply(F0['upRot' + s].clone().invert());
+      setBone(bones['up' + s], _F, uA.length() / D.len0['up' + s], F0['up' + s]);
+      // cơ vai: xoay nửa đường giữa thân và cánh tay → vai không bị bẹp khi giơ tay
+      const half = J.qb.clone().slerp(upQ, 0.5);
+      bones['dl' + s].matrixWorld.makeRotationFromQuaternion(half).setPosition(sh).multiply(F0['dl' + s]);
+      const kF = uF.length() / D.len0['fo' + s];
+      const z0 = perp(frA, uFn);
+      basis(el, uF, z0, _F);
+      setBone(bones['fo' + s], _F, kF, F0['fo' + s]);
+      // lòng bàn tay quay đúng kiểu cầm của bài (ngửa / úp / khép vào trong); độ xoay chia đều dọc cẳng tay
+      let ang = 0;
+      const want = B.palm ? palmTarget(B.palm, s, J, z0) : null;
+      if (want) {
+        const wp = want.sub(uFn.clone().multiplyScalar(want.dot(uFn)));
+        if (wp.lengthSq() > 1e-4) {
+          const rel = new T.Quaternion().setFromRotationMatrix(_F).multiply(F0['foRot' + s].clone().invert());
+          const cur = perp(D.H[s].pn.clone().applyQuaternion(rel), uFn);
+          wp.normalize();
+          ang = Math.atan2(uFn.dot(V().crossVectors(cur, wp)), cur.dot(wp));
+        }
+      }
+      setBone(bones['tw' + s], basis(el, uF, z0.clone().applyAxisAngle(uFn, ang / 2), _F), kF, F0['fo' + s]);
+      setBone(bones['ha' + s], basis(el, uF, z0.clone().applyAxisAngle(uFn, ang), _F), kF, F0['fo' + s]);
+      J['grip' + s] = D.H[s].grip.clone().applyMatrix4(bones['ha' + s].matrixWorld);
+      const hp = J['hip' + s], kn = J['knee' + s], an = J['ank' + s];
+      const uT = kn.clone().sub(hp), uS = an.clone().sub(kn);
+      setBone(bones['th' + s], basis(hp, uT, J['kp' + s], _F), uT.length() / D.len0['th' + s], F0['th' + s]);
+      setBone(bones['sk' + s], basis(kn, uS, J['kp' + s], _F), uS.length() / D.len0['sk' + s], F0['sk' + s]);
+      setBone(bones['ft' + s], basis(an, J['toe' + s].clone().sub(J['heel' + s]), V(0, 1, 0), _F), 1, F0['ft' + s]);
     }
-    B.hips.position.copy(J.pel).add(V(0, 0.02, -0.01).applyQuaternion(J.q));
-    B.hips.quaternion.copy(J.q);
-    B.abs.position.copy(J.pel.clone().lerp(J.mid, 0.75));
-    B.abs.quaternion.copy(J.q);
-    B.abs.scale.set(0.15, 0.17, 0.11);
-    B.chest.position.copy(J.mid.clone().lerp(J.chest, 0.52));
-    B.chest.quaternion.copy(J.qb);
-    B.chest.scale.set(0.2, 0.2, 0.125);
-    placeBetween(B.neck, J.chest, J.neck);
-    B.head.position.copy(J.head);
-    B.hair.position.copy(J.head.clone().add(V(0, 0.012, -0.012).applyQuaternion(J.qh)));
-    B.hair.quaternion.copy(J.qh);
-    B.hair.scale.set(1, 0.92, 1);
-    B.nose.position.copy(J.head.clone().add(V(0, -0.01, L.headR * 0.96).applyQuaternion(J.qh)));
+    B.U.glow.value = glow;
+  }
+
+  /* ── đường sáng chỉ quỹ đạo đúng (như ảnh mẫu): tay / chân / thân đang làm việc ── */
+  const CHAINS = { armL: ['shL', 'elbL', 'wrL'], armR: ['shR', 'elbR', 'wrR'], legL: ['hipL', 'kneeL', 'ankL'], legR: ['hipR', 'kneeR', 'ankR'], torso: ['pel', 'chest', 'neck'] };
+  function guideChains(def) {
+    if (def.guide) return def.guide;
+    const f = new Set(def.focus || []);
+    const legs = ['quads', 'glutes', 'hamstrings', 'adductors', 'calves'].some(m => f.has(m));
+    const arms = ['chest', 'delts_front', 'delts_side', 'delts_rear', 'traps', 'midback', 'lats', 'biceps', 'triceps', 'forearms'].some(m => f.has(m));
+    const core = ['abs', 'obliques', 'lower_back'].some(m => f.has(m));
+    return [].concat(arms ? ['armL', 'armR'] : [], legs ? ['legL', 'legR'] : [], !arms && !legs && core ? ['torso'] : []);
+  }
+  function makeGuides(scene, def) {
+    const names = guideChains(def);
+    const coreM = new T.MeshBasicMaterial({ color: 0x8dff7a, transparent: true, opacity: 0.95, depthTest: false, toneMapped: false });
+    const glowM = new T.MeshBasicMaterial({ color: 0x3dff45, transparent: true, opacity: 0.22, depthTest: false, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
+    const chains = names.map(n => {
+      const c = CHAINS[n], parts = [];
+      for (let i = 0; i < c.length - 1; i++) {
+        const a = new T.Mesh(new T.CylinderGeometry(0.0065, 0.0065, 1, 8), coreM);
+        const b = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 1, 12), glowM);
+        a.renderOrder = 11; b.renderOrder = 10; scene.add(a); scene.add(b);
+        parts.push({ p: c[i], q: c[i + 1], a, b });
+      }
+      const dot = new T.Mesh(new T.SphereGeometry(0.016, 14, 10), coreM); dot.renderOrder = 11; scene.add(dot);
+      return { n, side: n.slice(-1), parts, dot, mid: c[1] };
+    });
+    let on = true;
+    return {
+      get on() { return on; },
+      set on(v) { on = v; },
+      update(J, camPos) {
+        chains.forEach(ch => {
+          // chỉ vẽ bên gần camera (bên kia bị thân che), trừ khi nhìn thẳng
+          let vis = on;
+          if (vis && (ch.side === 'L' || ch.side === 'R')) {
+            const other = J[ch.mid.slice(0, -1) + (ch.side === 'L' ? 'R' : 'L')];
+            vis = camPos.distanceTo(J[ch.mid]) < camPos.distanceTo(other) + 0.12;
+          }
+          ch.parts.forEach(pt => { pt.a.visible = pt.b.visible = vis; if (vis) { placeBetween(pt.a, J[pt.p], J[pt.q]); placeBetween(pt.b, J[pt.p], J[pt.q]); } });
+          ch.dot.visible = vis; if (vis) ch.dot.position.copy(J[ch.mid]);
+        });
+      }
+    };
   }
 
   /* ── dụng cụ ── */
@@ -239,7 +400,7 @@
           const g = dumbbell(d.len || 0.3);
           out.push({ update(P, J) {
             const ax = P['db' + s] ? V(...P['db' + s]) : (s === 'L' ? V(1, 0, 0) : V(1, 0, 0));
-            orient(g, J['hand' + s], ax);
+            orient(g, J['grip' + s] || J['hand' + s], ax);
           } });
         });
       } else if (t === 'goblet') {
@@ -258,7 +419,7 @@
         g.traverse(o => { if (o.isMesh) o.castShadow = true; });
         scene.add(g);
         out.push({ update(P, J) {
-          const c = J.handL.clone().add(J.handR).multiplyScalar(0.5);
+          const c = (J.gripL || J.handL).clone().add(J.gripR || J.handR).multiplyScalar(0.5);
           if (d.offset) c.add(V(...d.offset));
           orient(g, c, J.handL.clone().sub(J.handR));
         } });
@@ -287,8 +448,9 @@
         out.push({ update(P, J) {
           const from = V(...d.from);
           let to;
-          if (d.to === 'L' || d.to === 'R') to = J['hand' + d.to].clone();
-          else to = J.handL.clone().add(J.handR).multiplyScalar(0.5);
+          const gL = J.gripL || J.handL, gR = J.gripR || J.handR;
+          if (d.to === 'L' || d.to === 'R') to = (d.to === 'L' ? gL : gR).clone();
+          else to = gL.clone().add(gR).multiplyScalar(0.5);
           if (ropeL) {
             const knot = to.clone().add(from.clone().sub(to).setLength(0.12));
             placeBetween(cab, from, knot);
@@ -317,7 +479,7 @@
         const me = cylM(d.r || 0.022, steel);
         const grip = cylM(0.02, dark);
         out.push({ update(P, J) {
-          const h = J['hand' + d.hand].clone();
+          const h = (J['grip' + d.hand] || J['hand' + d.hand]).clone();
           placeBetween(me, V(...d.from), h);
           const ax = d.grip ? V(...d.grip) : V(0, 1, 0);
           placeBetween(grip, h.clone().add(ax.clone().multiplyScalar(-0.07)), h.clone().add(ax.clone().multiplyScalar(0.07)));
@@ -372,6 +534,39 @@
     return out;
   }
 
+  // nền studio: xám ấm phía trên, tối dần xuống sàn (giống ảnh mẫu)
+  let BG = null;
+  function studioBg() {
+    if (BG) return BG;
+    const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+    const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, '#3a3e45'); gr.addColorStop(0.5, '#2a2d32'); gr.addColorStop(1, '#2a2d32');
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+    BG = new T.CanvasTexture(c); BG.encoding = T.sRGBEncoding;
+    return BG;
+  }
+
+  // ánh sáng môi trường kiểu studio chụp ảnh: hộp đèn mềm phía trước-trên, đèn viền xanh phía sau, sàn hắt nhẹ
+  function studioEnv(renderer) {
+    const env = new T.Scene();
+    env.add(new T.Mesh(new T.SphereGeometry(20, 32, 16), new T.MeshBasicMaterial({ side: T.BackSide, color: 0x2b2e34 })));
+    const panel = (w, h, pos, col, k) => {
+      const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color(col).multiplyScalar(k), side: T.DoubleSide }));
+      m.position.set(...pos); m.lookAt(0, 1, 0); env.add(m);
+    };
+    panel(7, 5, [3.5, 7, 6], 0xffffff, 3.2);     // hộp đèn chính
+    panel(5, 3, [-6, 3, 4], 0xf1f4ff, 1.1);      // đèn phụ
+    panel(3, 8, [-6, 4, -5], 0x9cc8ff, 2.6);     // viền xanh trái-sau
+    panel(3, 8, [6, 4, -5], 0x9cc8ff, 1.8);      // viền xanh phải-sau
+    panel(30, 30, [0, -0.5, 0], 0x3a3d43, 1.0);  // sàn hắt
+    const pm = new T.PMREMGenerator(renderer);
+    const rt = pm.fromScene(env, 0.035);
+    pm.dispose();
+    env.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    return rt.texture;
+  }
+
   /* ── registry & player ── */
   const REG = {};
   function define(id, def) { REG[id] = def; }
@@ -395,8 +590,9 @@
         <div class="a3-bar">
           <button type="button" class="a3-btn a3-play" aria-label="Tạm dừng">❚❚</button>
           <button type="button" class="a3-btn a3-speed" aria-label="Tốc độ">1×</button>
-          <span class="a3-views">${VIEWS.map(([lab, k]) => `<button type="button" class="a3-btn a3-view" data-v="${k}">${lab}</button>`).join('')}</span>
-          <span class="a3-hint">Kéo để xoay</span>
+          <button type="button" class="a3-btn a3-guide" aria-pressed="true" title="Bật/tắt đường sáng chỉ quỹ đạo đúng">Quỹ đạo</button>
+          ${opts.compact ? '' : `<span class="a3-views">${VIEWS.map(([lab, k]) => `<button type="button" class="a3-btn a3-view" data-v="${k}">${lab}</button>`).join('')}</span>
+          <span class="a3-hint">Kéo để xoay</span>`}${opts.extra ? `<span class="a3-extra">${opts.extra}</span>` : ''}
         </div>
       </div>`;
     const stage = root.querySelector('.a3-stage');
@@ -407,27 +603,33 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.outputEncoding = T.sRGBEncoding;
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
     stage.appendChild(renderer.domElement);
     const scene = new T.Scene();
-    scene.background = new T.Color(COLORS.bg);
-    scene.fog = new T.Fog(COLORS.bg, 7, 16);
+    scene.background = studioBg();
+    scene.fog = new T.Fog(COLORS.bg, 5, 14);
+    const envTex = studioEnv(renderer);
+    scene.environment = envTex;
     const cam = new T.PerspectiveCamera(32, 16 / 9, 0.05, 50);
-    scene.add(new T.HemisphereLight(0xdfefff, 0x0b1630, 0.75));
-    const sun = new T.DirectionalLight(0xffffff, 0.95);
-    sun.position.set(2.5, 5, 3.5);
+    scene.add(new T.HemisphereLight(0xe4ebf5, 0x2a2c30, 0.22));
+    const sun = new T.DirectionalLight(0xfffaf3, 0.95);
+    sun.position.set(2.2, 5, 3.8);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 5; sun.shadow.bias = -0.0004;
     Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 15 });
     scene.add(sun);
-    const rim = new T.DirectionalLight(0x22d3ee, 0.35); rim.position.set(-3, 2.5, -3); scene.add(rim);
-    // sàn kiểu sân bóng
-    const floor = new T.Mesh(new T.CircleGeometry(7, 64), mat(COLORS.floor, { roughness: 0.9 }));
+    const rim = new T.DirectionalLight(0xa9cfff, 0.7); rim.position.set(-3, 3, -3.5); scene.add(rim);
+    const rim2 = new T.DirectionalLight(0xa9cfff, 0.45); rim2.position.set(3.5, 2, -2.5); scene.add(rim2);
+    // sàn studio: cùng tông với nền, chỉ hiện bóng đổ mềm
+    const floor = new T.Mesh(new T.PlaneGeometry(80, 80), mat(COLORS.floor, { roughness: 0.95, metalness: 0 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-    const grid = new T.GridHelper(14, 28, COLORS.grid, COLORS.grid);
-    grid.material.transparent = true; grid.material.opacity = 0.12; grid.position.y = 0.002; scene.add(grid);
 
-    const B = makeBody(scene, def.focus);
+    const B = makeBody(scene, def);
+    if (!B) { renderer.dispose(); root.innerHTML = ''; return null; }
+    let glow = 0.3;
     const P = makeProps(scene, def.props);
+    const G = makeGuides(scene, def);
 
     // chuỗi động tác
     const keys = def.seq.map(k => ({ p: k[0], d: k[1], cap: k[2] || '' }));
@@ -435,11 +637,11 @@
     let speed = 1, playing = true, t = 0, last = performance.now(), rep = 1, raf = 0, dead = false;
 
     // camera
-    const camDef = Object.assign({ az: 40, el: 10, dist: 4.3, target: [0, 0.9, 0] }, def.cam || {});
+    const camDef = Object.assign({ az: 40, el: 10, dist: 4.3, target: [0, 0.9, 0] }, def.cam || {}, opts.cam || {});
     let az = camDef.az, el = camDef.el;
     const target = V(...camDef.target);
     function placeCam() {
-      const d = camDef.dist * (cam.aspect < 1.5 ? 1.12 : 1); // khung 4:3 trên điện thoại → lùi camera chút
+      const d = camDef.dist * (opts.zoom || 1) * (cam.aspect < 1.5 ? 1.12 : 1); // khung 4:3 trên điện thoại → lùi camera chút
       cam.position.set(target.x + d * Math.cos(el * DEG) * Math.sin(az * DEG), target.y + d * Math.sin(el * DEG), target.z + d * Math.cos(el * DEG) * Math.cos(az * DEG));
       cam.lookAt(target);
     }
@@ -459,18 +661,25 @@
       return { pose: keys[0].p, cap: keys[0].cap, idx: 0 };
     }
 
-    function draw() {
+    // nhịp gắng sức (phụ đề có "thở ra" hoặc "giữ") → cơ đang tập sáng mạnh, phồng nhẹ
+    const effortOf = cap => (/thở ra|giữ|Giữ|Siết|siết/.test(cap) ? 1 : 0.22);
+    let lastJ = null;
+    function draw(instant) {
       const r = poseAt(t);
       const J = solve(r.pose);
-      updateBody(B, J);
+      const target = effortOf(r.cap);
+      glow = instant ? target : glow + (target - glow) * 0.08;
+      lastJ = J;
+      updateBody(B, J, glow, r.pose);
       P.forEach(p => p.update(r.pose, J));
+      G.update(J, cam.position);
       if (capEl.textContent !== r.cap) capEl.textContent = r.cap;
       repEl.textContent = def.reps === false ? '' : 'Lần ' + rep;
       renderer.render(scene, cam);
     }
 
     function size() {
-      const w = stage.clientWidth || 320, h = Math.round(w * (w < 560 ? 0.75 : 9 / 16));
+      const w = stage.clientWidth || 320, h = Math.round(w * (opts.aspect || (w < 560 ? 0.75 : 9 / 16)));
       stage.style.height = h + 'px';
       renderer.setSize(w, h, false);
       renderer.domElement.style.width = '100%'; renderer.domElement.style.height = h + 'px';
@@ -504,6 +713,8 @@
       speed = speed === 1 ? 0.5 : speed === 0.5 ? 1.5 : 1;
       spBtn.textContent = (speed === 0.5 ? '0,5' : speed === 1.5 ? '1,5' : '1') + '×';
     });
+    const gBtn = root.querySelector('.a3-guide');
+    gBtn.addEventListener('click', () => { G.on = !G.on; gBtn.setAttribute('aria-pressed', G.on); draw(); });
     const presets = { a: [camDef.az, camDef.el], s: [def.side != null ? def.side : 90, 6], f: [def.front != null ? def.front : 0, 8] };
     root.querySelectorAll('.a3-view').forEach(b => b.addEventListener('click', () => {
       [az, el] = presets[b.dataset.v]; placeCam();
@@ -522,19 +733,25 @@
     stage.style.touchAction = 'pan-y';
 
     return {
-      setTime(sec) { t = ((sec % total) + total) % total; draw(); },
+      setTime(sec) { t = ((sec % total) + total) % total; draw(true); },
       pause() { playing = false; },
       view(k) { [az, el] = presets[k]; placeCam(); draw(); },
       setAngle(a, e) { az = a; el = e; placeCam(); draw(); },
+      angle: () => [az, el],
+      joints: () => lastJ,
+      look(tg, d) { target.set(tg[0], tg[1], tg[2]); camDef.dist = d; placeCam(); draw(true); },
       total,
       destroy() {
         dead = true; cancelAnimationFrame(raf); ro.disconnect();
         scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
+        envTex.dispose();
         renderer.dispose(); renderer.forceContextLoss && renderer.forceContextLoss();
         root.innerHTML = '';
       }
     };
   }
 
-  window.Anim3D = { define, has, mount, lib, solve, L, list: () => Object.keys(REG) };
+    // gán nhóm cơ chính (đỏ) & phụ (cam nhạt) cho một bài
+  function muscles(id, primary, secondary) { if (REG[id]) { REG[id].focus = primary || []; REG[id].assist = secondary || []; } }
+  window.Anim3D = { define, has, mount, muscles, lib, solve, L, MUSCLES, list: () => Object.keys(REG), info: id => REG[id], debugBody: () => bodyData() };
 })();

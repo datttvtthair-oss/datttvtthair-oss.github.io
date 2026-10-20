@@ -940,4 +940,63 @@
       ]
     });
   }
+
+  /* ═════════ NHÓM CƠ: đỏ = cơ chính, cam nhạt = cơ hỗ trợ ═════════ */
+  const MUS = {
+    'goblet-squat': [['quads', 'glutes'], ['adductors', 'abs']],
+    'db-rdl': [['hamstrings', 'glutes'], ['lower_back']],
+    'leg-press': [['quads', 'glutes'], ['adductors']],
+    'bulgarian-split-squat': [['quads', 'glutes'], ['adductors', 'hamstrings']],
+    'seated-leg-curl': [['hamstrings'], ['calves']],
+    'standing-calf-raise': [['calves'], []],
+    'pallof-press': [['obliques', 'abs'], []],
+    'cmj': [['quads', 'glutes', 'calves'], ['hamstrings']],
+    'trap-bar-deadlift': [['glutes', 'quads', 'hamstrings'], ['lower_back', 'traps', 'forearms']],
+    'step-up': [['glutes', 'quads'], ['hamstrings', 'calves']],
+    'hip-thrust': [['glutes'], ['hamstrings']],
+    'lying-leg-curl': [['hamstrings'], ['calves']],
+    'seated-calf-raise': [['calves'], []],
+    'db-bench-press': [['chest'], ['delts_front', 'triceps']],
+    'lat-pulldown': [['lats'], ['biceps', 'midback']],
+    'neutral-pulldown': [['lats'], ['biceps', 'midback']],
+    'seated-cable-row': [['midback', 'lats'], ['delts_rear', 'biceps']],
+    'incline-db-press': [['chest', 'delts_front'], ['triceps']],
+    'lateral-raise': [['delts_side'], ['traps']],
+    'face-pull': [['delts_rear', 'midback'], ['traps']],
+    'machine-chest-press': [['chest'], ['delts_front', 'triceps']],
+    'incline-machine-press': [['chest', 'delts_front'], ['triceps']],
+    'chest-supported-row': [['midback', 'lats'], ['delts_rear', 'biceps']],
+    'db-shoulder-press': [['delts_front', 'delts_side'], ['triceps', 'traps']],
+    'reverse-pec-deck': [['delts_rear'], ['midback', 'traps']],
+    'biceps-curl': [['biceps'], ['forearms']],
+    'cable-curl': [['biceps'], ['forearms']],
+    'triceps-pushdown': [['triceps'], []],
+    'cable-lateral-raise': [['delts_side'], ['traps']],
+    'dead-bug': [['abs'], ['obliques']],
+    'side-plank': [['obliques'], ['abs', 'glutes']],
+    'gym-warmup': [[], ['quads', 'glutes', 'delts_side', 'hamstrings']],
+    'bb-warmup': [[], ['quads', 'glutes', 'hamstrings', 'calves']],
+    'ball-handling': [['forearms'], ['delts_front', 'quads']],
+    'change-direction': [['quads', 'glutes', 'adductors'], ['calves']],
+    'acceleration': [['glutes', 'hamstrings', 'quads'], ['calves']],
+    'defensive-slide': [['glutes', 'adductors', 'quads'], ['calves']],
+    'shooting-form': [['triceps', 'delts_front'], ['quads', 'calves']],
+    'pullup-jumper': [['quads', 'triceps', 'delts_front'], ['calves', 'glutes']],
+    'stretching': [[], ['hamstrings', 'quads', 'chest']],
+    'mobility': [[], ['glutes', 'hamstrings', 'calves']],
+    'walk': [[], ['calves', 'quads']]
+  };
+  Object.entries(MUS).forEach(([id, [p, s]]) => A.muscles(id, p, s));
+
+  /* ═════════ HƯỚNG LÒNG BÀN TAY: 'sup' ngửa, 'pro' úp, hoặc [vào trong, lên, ra trước] theo thân ═════════ */
+  const PALM = {
+    'db-shoulder-press': [0, 0, 1], 'db-bench-press': [0, -1, 0], 'incline-db-press': [0, -1, 0],
+    'lat-pulldown': [0, 0, 1], 'neutral-pulldown': [1, 0, 0], 'seated-cable-row': [1, 0, 0], 'chest-supported-row': [1, 0, 0],
+    'face-pull': [1, -0.5, 0], 'machine-chest-press': [1, 0, 0], 'incline-machine-press': [1, 0, 0], 'reverse-pec-deck': [1, 0, 0],
+    'biceps-curl': 'sup', 'cable-curl': 'sup', 'triceps-pushdown': [1, 0, 0],
+    'lateral-raise': [1, -1.2, 0], 'cable-lateral-raise': [1, -1.2, 0],
+    'goblet-squat': [1, 1, 0], 'db-rdl': [0, 0, -1], 'trap-bar-deadlift': [1, 0, 0], 'step-up': [1, 0, 0], 'bulgarian-split-squat': [1, 0, 0],
+    'pallof-press': [1, 0, 0], 'dead-bug': [1, 0, 0], 'standing-calf-raise': [1, 0, 0], 'ball-handling': [0, -1, 0]
+  };
+  Object.entries(PALM).forEach(([id, p]) => { const d = A.info(id); if (d) d.palm = p; });
 })();

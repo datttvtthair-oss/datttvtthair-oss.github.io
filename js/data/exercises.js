@@ -1,10 +1,8 @@
 /*
  * Thư viện bài tập. Chỉ chứa dữ liệu — giao diện đọc từ window.EXERCISES.
- *  - video / videoVi: ID video YouTube (thông tin chi tiết ở js/data/videos.js).
- *  - photos: true  → dùng 2 ảnh img/ex/<id>-0.jpg và -1.jpg (tư thế đầu / cuối).
- *  - photos: false → dùng ảnh xem trước của video (img/yt/<videoId>.jpg) hoặc hình vẽ.
+ *  - Ảnh + hoạt hình: người mẫu 3D (img/3d/<id>-*.jpg, js/data/anim.js). Bài có art: hình vẽ thay ảnh.
+ *  - video / videoVi / photos: dữ liệu cũ (YouTube, ảnh người thật) — web không còn dùng.
  *  - alts: { id } trỏ tới bài khác trong thư viện (bấm được), { text } là gợi ý chữ.
- * Ảnh động tác: Free Exercise DB (public domain, github.com/yuhonas/free-exercise-db).
  */
 window.EXERCISES = {
 
