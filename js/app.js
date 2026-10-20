@@ -5,6 +5,7 @@
   const app = document.getElementById('app');
   const modalRoot = document.getElementById('modal');
   const timerRoot = document.getElementById('timer');
+  const SITE = 'https://datttvtthair-oss.github.io/'; // bản trên mạng, nơi video phát ngay trong trang
 
   /* ───────── tiện ích ───────── */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -530,6 +531,7 @@
         videoId: tab === 'clip' ? (e.video || e.videoVi || null) : vId,
         fallbackIds: tab === 'clip' ? [e.videoVi].filter(x => x && x !== e.video) : others,
         clip: tab === 'clip' ? clip : null, title: e.vi,
+        pageLink: SITE + '#' + day.id + '--' + showId,
         poster: e.photos ? 'img/ex/' + showId + '-0.jpg' : e.video ? 'img/yt/' + e.video + '.jpg' : null
       });
     }
@@ -663,7 +665,7 @@
         'Mỗi hiệp: nhập kg và số lần, bấm ✓. Đồng hồ nghỉ tự chạy (tắt được trong Tiến độ → Cài đặt). Bỏ trống mà bấm ✓ thì web điền lại số của lần trước.',
         'Cuối buổi: chấm mức mệt 1–10, đánh dấu nếu có đau, bấm “Hoàn thành buổi tập”.',
         VideoPlayer.inArtifact
-          ? 'Bản trên claude.ai không cho phát YouTube trong trang (giới hạn của claude.ai). Hãy dùng link GitHub Pages: bấm ảnh là video tự phát ngay trong trang.'
+          ? 'Bản trên claude.ai không cho phát video trong trang (giới hạn của claude.ai): bấm thẻ video sẽ mở đúng bài đó trên https://datttvtthair-oss.github.io — nơi video tự phát ngay trong trang. Nên dùng thẳng link đó ở phòng tập.'
           : 'Bấm ảnh bài tập là video tự phát ngay trong trang, không chuyển sang YouTube. Điện thoại chặn tiếng thì video vẫn phát không tiếng — bấm “Bật tiếng”. Video nào lỗi, web tự chuyển sang video dự phòng của bài đó.',
         'Ảnh động tác: Free Exercise DB (public domain). Video: các kênh hướng dẫn trên YouTube, ghi rõ nguồn dưới mỗi video.'
       ]

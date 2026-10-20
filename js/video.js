@@ -30,12 +30,13 @@
   function canEmbed() { return !inArtifact && !cspBlocked && !isFile; }
 
   /* Chỉ dùng khi nơi mở web không cho nhúng YouTube (không phải đường dẫn chính). */
-  function blockedCard(id, reason) {
+  function blockedCard(id, reason, pageLink) {
     const lead = reason === 'file'
-      ? 'Đang mở file trực tiếp nên YouTube không phát trong trang. Hãy mở web bằng start.bat hoặc link GitHub Pages để video tự phát ngay trong trang.'
-      : 'Bản trên claude.ai không cho phát YouTube trong trang. Dùng link GitHub Pages để video tự phát ngay trong trang; tạm thời bấm vào đây để xem.';
+      ? 'Đang mở file trực tiếp nên YouTube không phát trong trang. Bấm để mở bài này trên web Giáo án Hậu vệ — video tự phát ngay trong trang.'
+      : 'Bản trên claude.ai không cho phát video trong trang. Bấm để mở đúng bài này trên web Giáo án Hậu vệ — video tự phát ngay trong trang.';
+    const href = pageLink || watchUrl(id);
     return `
-      <a class="vp-card" href="${watchUrl(id)}" target="_blank" rel="noopener">
+      <a class="vp-card" href="${esc(href)}" target="_blank" rel="noopener">
         <img src="img/yt/${esc(id)}.jpg" alt="">
         <span class="vp-card-play" aria-hidden="true">${ICON_PLAY}</span>
         <span class="vp-card-text"><b>Xem video</b><span>${esc(lead)}</span></span>
@@ -55,7 +56,7 @@
 
     me.fail = reason => {
       if (active !== me) return;
-      if (reason === 'csp' || reason === 'file' || reason === 'artifact') { root.innerHTML = blockedCard(queue[0], reason); return; }
+      if (reason === 'csp' || reason === 'file' || reason === 'artifact') { root.innerHTML = blockedCard(queue[0], reason, opts.pageLink); return; }
       next();
     };
 
@@ -71,7 +72,7 @@
       return;
     }
     if (!queue.length) { root.innerHTML = ''; return; }
-    if (!canEmbed()) { root.innerHTML = blockedCard(queue[0], isFile ? 'file' : 'artifact'); return; }
+    if (!canEmbed()) { root.innerHTML = blockedCard(queue[0], isFile ? 'file' : 'artifact', opts.pageLink); return; }
     next();
 
     function next() {
