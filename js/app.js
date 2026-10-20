@@ -195,7 +195,7 @@
     return `<span class="ph ph-art ${cls || ''}">${ART[e.art] || ART.court}</span>`;
   }
 
-  function hasVideo(id) { const e = EX[id]; return !!(e && (e.video || CLIPS[id])); }
+  function hasVideo(id) { const e = EX[id]; return !!(e && (e.video || CLIPS[id] || (window.Anim3D && Anim3D.has(id)))); }
 
   function banner(b) {
     return `<div class="banner tone-${b.tone}" role="status"><b>${esc(b.title)}</b><span>${esc(b.text)}</span></div>`;
@@ -447,11 +447,18 @@
   function openModal(dayId, exId, altId, opener) {
     const day = DAY[dayId];
     if (!day || !EX[exId] || (altId && !EX[altId])) return;
-    modalState = { day, ex: exId, alt: altId || null, opener: opener || modalState && modalState.opener || null, tab: 'main' };
+    modalState = { day, ex: exId, alt: altId || null, opener: opener || modalState && modalState.opener || null, tab: '3d' };
     renderModal();
   }
 
+  let anim3d = null; // hoạt hình 3D đang chạy trong cửa sổ
+  function stopMedia() {
+    if (anim3d) { anim3d.destroy(); anim3d = null; }
+    VideoPlayer.unmount();
+  }
+
   function renderModal() {
+    stopMedia();
     const { day, ex, alt } = modalState;
     const order = dayOrder(day);
     const pos = order.findIndex(i => i.ex === ex);
@@ -464,8 +471,9 @@
     const prev = order[pos - 1], next = order[pos + 1];
     const clip = CLIPS[showId];
     const tabs = [];
+    if (window.Anim3D && Anim3D.has(showId) && !modalState.no3d) tabs.push({ id: '3d', label: '3D động tác' });
     if (clip) tabs.push({ id: 'clip', label: 'Clip tự làm' });
-    if (e.video) tabs.push({ id: 'main', label: VID[e.video] && VID[e.video].lang === 'vi' ? 'Video (tiếng Việt)' : 'Video hướng dẫn' });
+    if (e.video) tabs.push({ id: 'main', label: 'Video người thật' });
     if (e.videoVi) tabs.push({ id: 'vi', label: 'Bản tiếng Việt' });
     if (!tabs.some(t => t.id === modalState.tab)) modalState.tab = tabs.length ? tabs[0].id : null;
     const tab = modalState.tab;
@@ -494,9 +502,10 @@
           ${alt ? `<div class="banner tone-info"><b>Bài thay thế cho “${esc(EX[ex].vi)}”</b><span>Làm cùng số hiệp, số lần như bài gốc. <button type="button" class="link" data-act="alt" data-day="${day.id}" data-ex="${ex}" data-alt="">← Quay lại bài gốc</button></span></div>` : ''}
           ${tabs.length > 1 ? `<div class="vtabs" role="tablist">${tabs.map(t => `<button type="button" role="tab" aria-selected="${t.id === tab}" data-act="vtab" data-v="${t.id}">${esc(t.label)}</button>`).join('')}</div>` : ''}
           ${tabs.length ? `<div class="vp" id="vp"></div>
-            ${tab !== 'clip' && v ? `<p class="vsrc">Video: <b>${esc(v.title)}</b> — ${esc(v.ch)}${v.dur ? ' · ' + v.dur : ''}</p>` : ''}
+            ${(tab === 'main' || tab === 'vi') && v ? `<p class="vsrc">Video: <b>${esc(v.title)}</b> — ${esc(v.ch)}${v.dur ? ' · ' + v.dur : ''}</p>` : ''}
             ${tab === 'vi' && e.videoViNote ? `<p class="vsrc">${esc(e.videoViNote)}</p>` : ''}
-            ${tab === 'main' && v && v.lang === 'en' ? '<p class="vsrc muted">Video tiếng Anh — xem hình là đủ; các bước bằng tiếng Việt ở bên dưới.</p>' : ''}`
+            ${tab === 'main' && v && v.lang === 'en' ? '<p class="vsrc muted">Video tiếng Anh — xem hình là đủ; các bước bằng tiếng Việt ở bên dưới. Video YouTube có thể có quảng cáo.</p>' : ''}
+            ${tab === '3d' ? '<p class="vsrc muted">Hoạt hình 3D dựng theo đúng các bước bên dưới · phần tô cam là nhóm cơ chính · kéo để xoay, bấm Nghiêng / Bên / Trước để đổi góc, 1× để chỉnh tốc độ.</p>' : ''}`
           : `<div class="novideo">${media(showId)}<p>Hoạt động này không cần video — làm theo các bước bên dưới.</p></div>`}
 
           <div class="rxbox">
@@ -525,7 +534,13 @@
       </div>`;
     document.documentElement.classList.add('modal-open');
     const vp = document.getElementById('vp');
-    if (vp) {
+    if (vp && tab === '3d') {
+      anim3d = Anim3D.mount(vp, showId);
+      if (!anim3d) { // máy không có WebGL → dùng video người thật
+        modalState.no3d = true; modalState.tab = e.video ? 'main' : 'vi';
+        return renderModal();
+      }
+    } else if (vp) {
       const others = [e.video, e.videoVi].filter(x => x && x !== vId);
       VideoPlayer.mount(vp, {
         videoId: tab === 'clip' ? (e.video || e.videoVi || null) : vId,
@@ -542,7 +557,7 @@
   function closeModalUI() {
     if (!modalState) return;
     const opener = modalState.opener;
-    VideoPlayer.unmount();
+    stopMedia();
     modalRoot.innerHTML = '';
     document.documentElement.classList.remove('modal-open');
     modalState = null;
