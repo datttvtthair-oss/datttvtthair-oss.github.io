@@ -25,6 +25,11 @@
     sh: 0.188, shDrop: 0.045, neck: 0.061, headR: 0.105, upper: 0.27, fore: 0.26
   };
   const STAND_Y = L.ankleH + L.shank + L.thigh; // 0.955 — số đo khớp khớp với khung người trong js/data/body.js
+  // vai / hông / cột sống lấy đúng theo người mẫu (js/data/body.js) để da không bị kéo giãn ở vai
+  if (window.BODY_MESH && window.BODY_MESH.rest) {
+    const r = window.BODY_MESH.rest;
+    L.sh = r.shL[0]; L.hip = r.hipL[0]; L.spine = r.chest[1] - r.pel[1]; L.neck = r.neck[1] - r.chest[1]; L.shDrop = r.chest[1] - r.shL[1];
+  }
 
   const COLORS = {
     bg: 0x2a2d32, floor: 0x2b2e33, body: 0xc4c8ce, hot: 0xff4a1c, hotGlow: 0xff2a0a, warm: 0xff9c66, shorts: 0x15171b, rimBlue: 0x7cc8ff,
@@ -150,30 +155,101 @@
   const perp = (v, u) => v.clone().sub(u.clone().multiplyScalar(v.dot(u))).normalize();
 
   let BODY = null; // hình học + khung nghỉ, dựng một lần
+  const dec64 = s => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+
+  /* Chia mịn Catmull–Clark 1 cấp cho lưới tứ giác (mỗi mặt → 4 mặt): bề mặt cơ thể căng mượt như người thật.
+     a: { pos, quads, skI, skW (4/đỉnh), mus, mInt (2/đỉnh), lin: { tên: [mảng, số thành phần] } } */
+  function subdivide(a) {
+    const n = a.pos.length / 3, m = a.quads.length / 4, Q = a.quads;
+    const emap = new Map(), eA = [], eB = [], eF0 = [], eF1 = [];
+    for (let f = 0; f < m; f++) for (let i = 0; i < 4; i++) {
+      const p = Q[f * 4 + i], q = Q[f * 4 + (i + 1) % 4], k = p < q ? p * n + q : q * n + p;
+      const e = emap.get(k);
+      if (e === undefined) { emap.set(k, eA.length); eA.push(p); eB.push(q); eF0.push(f); eF1.push(-1); } else eF1[e] = f;
+    }
+    const E = eA.length, N2 = n + E + m, P = a.pos, P2 = new Float32Array(N2 * 3);
+    const fp = (f, c) => (P[Q[f * 4] * 3 + c] + P[Q[f * 4 + 1] * 3 + c] + P[Q[f * 4 + 2] * 3 + c] + P[Q[f * 4 + 3] * 3 + c]) / 4;
+    for (let f = 0; f < m; f++) for (let c = 0; c < 3; c++) P2[(n + E + f) * 3 + c] = fp(f, c);
+    const sF = new Float32Array(n * 3), cF = new Uint16Array(n), sE = new Float32Array(n * 3), cE = new Uint16Array(n), sB = new Float32Array(n * 3), cB = new Uint8Array(n);
+    for (let f = 0; f < m; f++) for (let i = 0; i < 4; i++) { const v = Q[f * 4 + i]; cF[v]++; for (let c = 0; c < 3; c++) sF[v * 3 + c] += P2[(n + E + f) * 3 + c]; }
+    for (let e = 0; e < E; e++) {
+      const p = eA[e], q = eB[e], b = eF1[e] < 0;
+      for (let c = 0; c < 3; c++) {
+        const mid = (P[p * 3 + c] + P[q * 3 + c]) / 2;
+        P2[(n + e) * 3 + c] = b ? mid : (P[p * 3 + c] + P[q * 3 + c] + P2[(n + E + eF0[e]) * 3 + c] + P2[(n + E + eF1[e]) * 3 + c]) / 4;
+        sE[p * 3 + c] += mid; sE[q * 3 + c] += mid;
+        if (b) { sB[p * 3 + c] += P[q * 3 + c]; sB[q * 3 + c] += P[p * 3 + c]; }
+      }
+      cE[p]++; cE[q]++; if (b) { cB[p]++; cB[q]++; }
+    }
+    for (let v = 0; v < n; v++) for (let c = 0; c < 3; c++) {
+      const o = P[v * 3 + c];
+      if (cB[v] >= 2) P2[v * 3 + c] = 0.75 * o + 0.25 * sB[v * 3 + c] / cB[v];
+      else { const k = cF[v] || 1; P2[v * 3 + c] = (sF[v * 3 + c] / k + 2 * sE[v * 3 + c] / (cE[v] || 1) + (k - 3) * o) / k; }
+    }
+    // thuộc tính: đỉnh cũ giữ nguyên; điểm cạnh = trung bình 2 đầu; điểm mặt = trung bình 4 góc
+    const corners = j => (j < n ? [j] : j < n + E ? [eA[j - n], eB[j - n]] : [Q[(j - n - E) * 4], Q[(j - n - E) * 4 + 1], Q[(j - n - E) * 4 + 2], Q[(j - n - E) * 4 + 3]]);
+    const out = { pos: P2, lin: {} };
+    Object.keys(a.lin).forEach(k => {
+      const [src, sz] = a.lin[k], dst = new Float32Array(N2 * sz);
+      for (let j = 0; j < N2; j++) { const cs = corners(j); for (let c = 0; c < sz; c++) { let s = 0; cs.forEach(v => { s += src[v * sz + c]; }); dst[j * sz + c] = s / cs.length; } }
+      out.lin[k] = [dst, sz];
+    });
+    // trọng số xương (4) và nhóm cơ (2): cộng dồn rồi giữ các giá trị lớn nhất
+    const mixTop = (I, W, k, keep) => {
+      const oi = new Float32Array(N2 * keep), ow = new Float32Array(N2 * keep), acc = new Map();
+      for (let j = 0; j < N2; j++) {
+        const cs = corners(j); acc.clear();
+        cs.forEach(v => { for (let c = 0; c < k; c++) { const id = I[v * k + c], w = W[v * k + c]; if (w > 0 && id < 255) acc.set(id, (acc.get(id) || 0) + w / cs.length); } });
+        const top = [...acc.entries()].sort((x, y) => y[1] - x[1]).slice(0, keep);
+        for (let c = 0; c < keep; c++) { oi[j * keep + c] = top[c] ? top[c][0] : (keep === 2 ? 255 : 0); ow[j * keep + c] = top[c] ? top[c][1] : 0; }
+      }
+      return [oi, ow];
+    };
+    [out.skI, out.skW] = mixTop(a.skI, a.skW, 4, 4);
+    [out.mus, out.mInt] = mixTop(a.mus, a.mInt, 2, 2);
+    const nq = new Uint32Array(m * 16);
+    for (let f = 0; f < m; f++) for (let i = 0; i < 4; i++) {
+      const v = Q[f * 4 + i], p = Q[f * 4 + (i + 1) % 4], z = Q[f * 4 + (i + 3) % 4];
+      const e1 = emap.get(v < p ? v * n + p : p * n + v), e0 = emap.get(z < v ? z * n + v : v * n + z);
+      nq.set([v, n + e1, n + E + f, n + e0], (f * 4 + i) * 4);
+    }
+    out.quads = nq;
+    return out;
+  }
+
+  // giải mã một lưới (thân hoặc quần) rồi chia mịn `levels` cấp → BufferGeometry có xương
+  function meshGeometry(M, levels, extra) {
+    const q = new Int16Array(dec64(M.pos).buffer), pos = new Float32Array(M.n * 3);
+    for (let i = 0; i < pos.length; i++) { const k = i % 3; pos[i] = M.posMin[k] + (q[i] + 32767) * M.posScale[k]; }
+    const f01 = s => Float32Array.from(dec64(s), v => v / 255);
+    const sw = dec64(M.skW), w = new Float32Array(sw.length);
+    for (let i = 0; i < sw.length; i += 4) { const s = (sw[i] + sw[i + 1] + sw[i + 2] + sw[i + 3]) || 1; for (let j = 0; j < 4; j++) w[i + j] = sw[i + j] / s; }
+    let d = { pos, quads: Uint32Array.from(new Uint16Array(dec64(M.quads).buffer)), skI: Float32Array.from(dec64(M.skI)), skW: w,
+      mus: Float32Array.from(dec64(M.mus)), mInt: f01(M.mInt), lin: {} };
+    extra.forEach(k => { d.lin[k] = [M[k] ? f01(M[k]) : new Float32Array(M.n).fill(k === 'ao' ? 1 : 0), 1]; });
+    for (let l = 0; l < levels; l++) d = subdivide(d);
+    const g = new T.BufferGeometry(), nv = d.pos.length / 3, nq = d.quads.length / 4;
+    const idx = new Uint32Array(nq * 6);
+    for (let f = 0; f < nq; f++) { const a = d.quads[f * 4], b = d.quads[f * 4 + 1], c = d.quads[f * 4 + 2], e = d.quads[f * 4 + 3]; idx.set([a, b, c, a, c, e], f * 6); }
+    g.setIndex(new T.BufferAttribute(idx, 1));
+    g.setAttribute('position', new T.BufferAttribute(d.pos, 3));
+    g.setAttribute('skinIndex', new T.Uint16BufferAttribute(Uint16Array.from(d.skI), 4));
+    g.setAttribute('skinWeight', new T.BufferAttribute(d.skW, 4));
+    g.setAttribute('mus', new T.BufferAttribute(d.mus, 2)); // 2 nhóm cơ mạnh nhất ở mỗi đỉnh
+    g.setAttribute('mInt', new T.BufferAttribute(d.mInt, 2));
+    extra.forEach(k => g.setAttribute(k, new T.BufferAttribute(d.lin[k][0], 1)));
+    g.computeVertexNormals();
+    g.userData.verts = nv;
+    return g;
+  }
+
   function bodyData() {
     if (BODY) return BODY;
     const M = window.BODY_MESH;
     if (!M) return null;
-    const dec = s => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
-    const q = new Int16Array(dec(M.pos).buffer);
-    const pos = new Float32Array(M.n * 3);
-    for (let i = 0; i < pos.length; i++) { const k = i % 3; pos[i] = M.posMin[k] + (q[i] + 32767) * M.posScale[k]; }
-    const g = new T.BufferGeometry();
-    g.setAttribute('position', new T.BufferAttribute(pos, 3));
-    g.setIndex(new T.BufferAttribute(new Uint16Array(dec(M.idx).buffer), 1));
-    g.setAttribute('skinIndex', new T.Uint16BufferAttribute(Uint16Array.from(dec(M.skI)), 4));
-    const sw = dec(M.skW), w = new Float32Array(sw.length);
-    for (let i = 0; i < sw.length; i += 4) {
-      const s = (sw[i] + sw[i + 1] + sw[i + 2] + sw[i + 3]) || 1;
-      for (let j = 0; j < 4; j++) w[i + j] = sw[i + j] / s;
-    }
-    g.setAttribute('skinWeight', new T.BufferAttribute(w, 4));
-    const f01 = s => Float32Array.from(dec(s), v => v / 255);
-    g.setAttribute('mus', new T.BufferAttribute(Float32Array.from(dec(M.mus)), 2)); // 2 nhóm cơ mạnh nhất ở mỗi đỉnh
-    g.setAttribute('mInt', new T.BufferAttribute(f01(M.mInt), 2));
-    g.setAttribute('shorts', new T.BufferAttribute(f01(M.shorts), 1));
-    g.setAttribute('ao', M.ao ? new T.BufferAttribute(f01(M.ao), 1) : new T.BufferAttribute(new Float32Array(M.n).fill(1), 1)); // bóng trong khe cơ
-    g.computeVertexNormals();
+    const g = meshGeometry(M, 1, ['shorts', 'ao']);
+    const gs = M.shortsMesh ? meshGeometry(M.shortsMesh, 1, ['ao', 'band', 'stripe', 'inner']) : null;
     const R = {}; Object.keys(M.rest).forEach(k => { R[k] = V(...M.rest[k]); });
     // khung xương lúc nghỉ (gốc, trục dọc y, trục trước z) → lưu nghịch đảo
     const F0 = {}, len0 = {};
@@ -202,7 +278,7 @@
     }
     const H = {};
     ['L', 'R'].forEach(s => { H[s] = { grip: V(...M.hand[s].grip), pn: V(...M.hand[s].pn).normalize() }; });
-    BODY = { geo: g, R, F0, len0, H, names: M.bones.map(n => n.replace(/^sh([LR])$/, 'sk$1')) };
+    BODY = { geo: g, geoS: gs, R, F0, len0, H, names: M.bones.map(n => n.replace(/^sh([LR])$/, 'sk$1')) };
     return BODY;
   }
 
@@ -231,9 +307,9 @@
             '  vec3 hotC = mix(vec3(0.8, 0.07, 0.02), vec3(1.0, 0.24, 0.05), smoothstep(0.45, 1.0, vHot));',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, hotC, hotK);',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.6, 0.38), smoothstep(0.0, 0.6, vWarm) * 0.7);',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.045, 0.047, 0.052), vec3(0.34, 0.04, 0.02), hotK * 0.45), vShorts);'].join('\n'))
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.047, 0.052), smoothstep(0.85, 1.0, vShorts));'].join('\n'))
           .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  reflectedLight.indirectDiffuse *= vAO;\n  reflectedLight.indirectSpecular *= vAO * vAO;')
-          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.85, vShorts);')
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.85, smoothstep(0.85, 1.0, vShorts));')
           .replace('#include <emissivemap_fragment>', [
             '#include <emissivemap_fragment>',
             '  float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);',
@@ -242,6 +318,47 @@
             '  totalEmissiveRadiance += vec3(1.0, 0.4, 0.15) * smoothstep(0.0, 0.6, vWarm) * 0.1;'].join('\n'));
     };
     m.customProgramCacheKey = () => 'togi-body-3';
+    return m;
+  }
+
+  // quần short: vải thể thao đen mờ có ánh sheen, cạp chun có gân, viền hông xám, mặt trong tối
+  function shortsMaterial(levels, U) {
+    const m = new T.MeshPhysicalMaterial({ color: 0x18191d, roughness: 0.8, metalness: 0, sheen: 0.35, sheenRoughness: 0.6,
+      sheenColor: new T.Color(0x4a4f58), side: T.DoubleSide, envMapIntensity: 0.6 });
+    m.extensions = { derivatives: true };
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uLvl = { value: levels };
+      sh.uniforms.uGlow = U.glow;
+      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float ao;\nattribute float band;\nattribute float stripe;\nattribute float inner;\nuniform float uLvl[18];\nvarying float vHot;\nvarying float vAO;\nvarying float vBand;\nvarying float vStripe;\nvarying float vInner;\nvarying vec3 vRest;\n' +
+        sh.vertexShader.replace('#include <begin_vertex>', [
+          '#include <begin_vertex>',
+          '  int m1 = int(mus.x + 0.5); int m2 = int(mus.y + 0.5);',
+          '  float l1 = 0.0; float l2 = 0.0;',
+          '  for (int i = 0; i < 18; i++) { if (i == m1) l1 = uLvl[i]; if (i == m2) l2 = uLvl[i]; }',
+          '  vHot = clamp((l1 > 0.75 ? mInt.x : 0.0) + (l2 > 0.75 ? mInt.y : 0.0), 0.0, 1.0);',
+          '  vAO = ao; vBand = band; vStripe = stripe; vInner = inner; vRest = position;'].join('\n'));
+      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vAO;\nvarying float vBand;\nvarying float vStripe;\nvarying float vInner;\nvarying vec3 vRest;\n' +
+        'vec3 fabricBump(vec3 p, vec3 n, float h) { vec3 sx = dFdx(p); vec3 sy = dFdy(p); vec3 r1 = cross(sy, n); vec3 r2 = cross(n, sx); float det = dot(sx, r1); vec2 dh = vec2(dFdx(h), dFdy(h)); vec3 gr = sign(det) * (dh.x * r1 + dh.y * r2); return normalize(abs(det) * n - gr); }\n' +
+        sh.fragmentShader
+          .replace('#include <color_fragment>', [
+            '#include <color_fragment>',
+            '  float hotK = smoothstep(0.0, 0.5, vHot);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.11, 0.115, 0.125), vBand);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.45, 0.47, 0.51), vStripe * 0.85);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.031, 0.034), vInner);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.035, 0.015), hotK * 0.12);',
+            '  diffuseColor.rgb *= mix(1.0, vAO, 0.5);'].join('\n'))
+          .replace('#include <normal_fragment_maps>', [
+            '#include <normal_fragment_maps>',
+            '  float bh = vBand * 0.0008 * sin(6.2832 * vRest.y / 0.0115);',
+            '  normal = fabricBump(-vViewPosition, normal, bh);'].join('\n'))
+          .replace('#include <emissivemap_fragment>', [
+            '#include <emissivemap_fragment>',
+            '  float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);',
+            '  totalEmissiveRadiance += vec3(0.42, 0.66, 1.0) * rimF * 0.12 * (1.0 - vInner);',
+            '  totalEmissiveRadiance += vec3(1.0, 0.13, 0.02) * hotK * (0.025 + 0.07 * uGlow);'].join('\n'));
+    };
+    m.customProgramCacheKey = () => 'togi-shorts-1';
     return m;
   }
 
@@ -265,6 +382,12 @@
     mesh.bind(skel, new T.Matrix4());
     mesh.frustumCulled = false; mesh.castShadow = true;
     scene.add(mesh);
+    if (D.geoS) { // lớp vải quần, dùng chung bộ xương
+      const sm = new T.SkinnedMesh(D.geoS, shortsMaterial(lv, U));
+      sm.bind(skel, new T.Matrix4());
+      sm.frustumCulled = false; sm.castShadow = true;
+      scene.add(sm);
+    }
     const idx = {}; D.names.forEach((n, i) => { idx[n] = bones[i]; });
     return { mesh, bones: idx, U, D, palm: def.palm || null };
   }
@@ -561,8 +684,8 @@
     };
     panel(7, 5, [3.5, 7, 6], 0xffffff, 3.2);     // hộp đèn chính
     panel(5, 3, [-6, 3, 4], 0xf1f4ff, 1.1);      // đèn phụ
-    panel(3, 8, [-6, 4, -5], 0xb4d4ff, 1.5);     // viền xanh trái-sau
-    panel(3, 8, [6, 4, -5], 0xb4d4ff, 1.0);      // viền xanh phải-sau
+    panel(3, 8, [-6, 4, -5], 0xd2defa, 1.4);     // đèn viền trái-sau
+    panel(3, 8, [6, 4, -5], 0xd2defa, 0.9);      // đèn viền phải-sau
     panel(30, 30, [0, -0.5, 0], 0x3a3d43, 1.0);  // sàn hắt
     const pm = new T.PMREMGenerator(renderer);
     const rt = pm.fromScene(env, 0.035);
@@ -623,8 +746,8 @@
     sun.shadow.radius = 5; sun.shadow.bias = -0.0004;
     Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 15 });
     scene.add(sun);
-    const rim = new T.DirectionalLight(0xa9cfff, 0.4); rim.position.set(-3, 3, -3.5); scene.add(rim);
-    const rim2 = new T.DirectionalLight(0xa9cfff, 0.25); rim2.position.set(3.5, 2, -2.5); scene.add(rim2);
+    const rim = new T.DirectionalLight(0xdbe5ff, 0.45); rim.position.set(-3, 3, -3.5); scene.add(rim);
+    const rim2 = new T.DirectionalLight(0xdbe5ff, 0.3); rim2.position.set(3.5, 2, -2.5); scene.add(rim2);
     // sàn studio: cùng tông với nền, chỉ hiện bóng đổ mềm
     const floor = new T.Mesh(new T.PlaneGeometry(80, 80), mat(COLORS.floor, { roughness: 0.95, metalness: 0 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
@@ -743,6 +866,7 @@
       setAngle(a, e) { az = a; el = e; placeCam(); draw(); },
       angle: () => [az, el],
       joints: () => lastJ,
+      scene,
       look(tg, d) { target.set(tg[0], tg[1], tg[2]); camDef.dist = d; placeCam(); draw(true); },
       total,
       destroy() {
