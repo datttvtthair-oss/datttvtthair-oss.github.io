@@ -231,7 +231,7 @@
     const bot = P(base, { pel: [0, 0.27, 0.05], tr: [-55, 0, 0], hd: 25, wL: [0.33, 0.45, 0.1], wR: [-0.33, 0.45, 0.1] });
     const top = P(base, { pel: [0, 0.6, 0.0], tr: [-88, 0, 0], hd: 40, wL: [0.33, 0.78, 0.05], wR: [-0.33, 0.78, 0.05] });
     A.define('hip-thrust', {
-      cam: { az: 85, el: 10, dist: 4.3, target: [0, 0.5, 0.0] },
+      cam: { az: 38, el: 14, dist: 4.3, target: [0, 0.5, 0.0] },   // chéo 3/4: đĩa tạ không che mông
       focus: ['glute'],
       props: [{ type: 'bench', pos: [0, 0.42, -0.55], seat: 0.4, w: 1.1 }, { type: 'barbell', len: 1.5, plateR: 0.2, offset: [0, -0.03, 0] }],
       seq: [
