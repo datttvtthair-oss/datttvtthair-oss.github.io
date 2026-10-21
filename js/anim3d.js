@@ -32,7 +32,7 @@
   }
 
   const COLORS = {
-    bg: 0x2a2d32, floor: 0x2b2e33, body: 0xc4c8ce, hot: 0xff4a1c, hotGlow: 0xff2a0a, warm: 0xff9c66, shorts: 0x15171b, rimBlue: 0x7cc8ff,
+    bg: 0xf3f5f4, floor: 0xf3f5f4, body: 0xc99274, backdrop: 0xdcefe6, hot: 0xff4a1c, hotGlow: 0xff2a0a, warm: 0xff9c66, shorts: 0x15171b, rimBlue: 0x7cc8ff,
     sole: 0xff8a3d, steel: 0x3b4250, dark: 0x1b1f26, pad: 0x262a32, plate: 0x0e1013, chrome: 0xb9c2cf,
     ball: 0xe46a1f, rim: 0xff5a1f, cable: 0xd6dde6, mat: 0x23272e
   };
@@ -228,6 +228,7 @@
     let d = { pos, quads: Uint32Array.from(new Uint16Array(dec64(M.quads).buffer)), skI: Float32Array.from(dec64(M.skI)), skW: w,
       mus: Float32Array.from(dec64(M.mus)), mInt: f01(M.mInt), lin: {} };
     extra.forEach(k => { d.lin[k] = [M[k] ? f01(M[k]) : new Float32Array(M.n).fill(k === 'ao' ? 1 : 0), 1]; });
+    ['fs', 'fa'].forEach(k => { if (M[k]) d.lin[k] = [Float32Array.from(new Int16Array(dec64(M[k]).buffer), v => v / 30000), 1]; }); // toạ độ thớ cơ
     for (let l = 0; l < levels; l++) d = subdivide(d);
     const g = new T.BufferGeometry(), nv = d.pos.length / 3, nq = d.quads.length / 4;
     const idx = new Uint32Array(nq * 6);
@@ -239,6 +240,7 @@
     g.setAttribute('mus', new T.BufferAttribute(d.mus, 2)); // 2 nhóm cơ mạnh nhất ở mỗi đỉnh
     g.setAttribute('mInt', new T.BufferAttribute(d.mInt, 2));
     extra.forEach(k => g.setAttribute(k, new T.BufferAttribute(d.lin[k][0], 1)));
+    ['fs', 'fa'].forEach(k => { if (d.lin[k]) g.setAttribute(k, new T.BufferAttribute(d.lin[k][0], 1)); });
     g.computeVertexNormals();
     g.userData.verts = nv;
     return g;
@@ -282,12 +284,14 @@
     return BODY;
   }
 
+  // da người thật; nhóm cơ đang tập hiện thớ cơ đỏ như tranh giải phẫu (cơ phụ: thớ cơ mờ hơn)
   function bodyMaterial(levels, U) {
-    const m = new T.MeshStandardMaterial({ color: COLORS.body, roughness: 0.46, metalness: 0.0, envMapIntensity: 0.8 });
+    const m = new T.MeshStandardMaterial({ color: COLORS.body, roughness: 0.55, metalness: 0.0, envMapIntensity: 0.55 });
+    m.extensions = { derivatives: true };
     m.onBeforeCompile = sh => {
       sh.uniforms.uLvl = { value: levels };
       sh.uniforms.uGlow = U.glow;
-      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float shorts;\nattribute float ao;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\n' +
+      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float shorts;\nattribute float ao;\nattribute float fs;\nattribute float fa;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\nvarying float vS;\nvarying float vSa;\n' +
         sh.vertexShader.replace('#include <begin_vertex>', [
           '#include <begin_vertex>',
           '  int m1 = int(mus.x + 0.5); int m2 = int(mus.y + 0.5);',
@@ -297,34 +301,44 @@
           '  vWarm = clamp((l1 > 0.25 && l1 < 0.75 ? mInt.x : 0.0) + (l2 > 0.25 && l2 < 0.75 ? mInt.y : 0.0), 0.0, 1.0);',
           '  vShorts = shorts;',
           '  vAO = ao;',
-          '  transformed += objectNormal * (vHot * uGlow * 0.004);'].join('\n'));
-      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\n' +
+          '  vS = fs;   // toạ độ vuông góc thớ cơ (tính sẵn theo từng cơ)',
+          '  vSa = fa;  // toạ độ dọc thớ cơ',
+          '  transformed += objectNormal * (vHot * uGlow * 0.003);'].join('\n'));
+      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\nvarying float vS;\nvarying float vSa;\n' +
+        'vec3 bumpN(vec3 p, vec3 n, float h) { vec3 sx = dFdx(p); vec3 sy = dFdy(p); vec3 r1 = cross(sy, n); vec3 r2 = cross(n, sx); float det = dot(sx, r1); vec2 dh = vec2(dFdx(h), dFdy(h)); vec3 gr = sign(det) * (dh.x * r1 + dh.y * r2); return normalize(abs(det) * n - gr); }\n' +
         sh.fragmentShader
           .replace('#include <color_fragment>', [
             '#include <color_fragment>',
-            '  diffuseColor.rgb *= mix(1.0, vAO, 0.65);',
-            '  float hotK = smoothstep(0.0, 0.5, vHot);',
-            '  vec3 hotC = mix(vec3(0.8, 0.07, 0.02), vec3(1.0, 0.24, 0.05), smoothstep(0.45, 1.0, vHot));',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, hotC, hotK);',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.6, 0.38), smoothstep(0.0, 0.6, vWarm) * 0.7);',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.047, 0.052), smoothstep(0.85, 1.0, vShorts));'].join('\n'))
+            '  diffuseColor.rgb *= mix(1.0, vAO, 0.5);',
+            '  float mk = smoothstep(0.32, 0.46, vHot);',
+            '  float mw = smoothstep(0.32, 0.5, vWarm) * 0.45;',
+            '  float fs = vS * 1150.0 + 0.45 * sin(vSa * 55.0) + 0.3 * sin(vSa * 170.0 + vS * 140.0);',
+            '  float fs2 = vS * 3100.0 + 0.8 * sin(vSa * 90.0 + vS * 500.0);',
+            '  float faa = 1.0 - smoothstep(0.9, 2.6, fwidth(fs));       // xa quá thì thớ cơ mờ dần (không nhiễu)',
+            '  float faa2 = 1.0 - smoothstep(0.9, 2.6, fwidth(fs2));',
+            '  float stripe = 0.5 + faa * 0.38 * sin(fs) + faa2 * 0.18 * sin(fs2) + 0.06 * sin(vSa * 31.0 + vS * 47.0);',
+            '  vec3 musC = mix(vec3(0.12, 0.009, 0.006), vec3(0.42, 0.035, 0.02), clamp(stripe, 0.0, 1.0)) * (0.9 + 0.2 * uGlow);   // màu tuyến tính: đỏ thịt',
+            '  float edge = 4.0 * mk * (1.0 - mk);',
+            '  float mAll = max(mk, mw);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, musC * mix(1.0, vAO, 0.4) * (1.0 - 0.25 * edge), mAll);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.047, 0.052), smoothstep(0.85, 1.0, vShorts));',
+            window.__dbgFib ? '  diffuseColor.rgb = vec3(fract(vS * 40.0), faa, stripe);' : ''].join('\n'))
           .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  reflectedLight.indirectDiffuse *= vAO;\n  reflectedLight.indirectSpecular *= vAO * vAO;')
-          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.85, smoothstep(0.85, 1.0, vShorts));')
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.5, mAll);\n  roughnessFactor = mix(roughnessFactor, 0.85, smoothstep(0.85, 1.0, vShorts));')
+          .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = bumpN(-vViewPosition, normal, (stripe - 0.5) * 0.00028 * mAll);')
           .replace('#include <emissivemap_fragment>', [
             '#include <emissivemap_fragment>',
-            '  float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);',
-            '  totalEmissiveRadiance += vec3(0.42, 0.66, 1.0) * rimF * (0.5 - 0.38 * vShorts);',
-            '  totalEmissiveRadiance += vec3(1.0, 0.13, 0.02) * smoothstep(0.0, 0.5, vHot) * (0.3 + 0.75 * uGlow) * (1.0 - 0.8 * vShorts);',
-            '  totalEmissiveRadiance += vec3(1.0, 0.4, 0.15) * smoothstep(0.0, 0.6, vWarm) * 0.1;'].join('\n'));
+            '  totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.5, 0.4) * 0.05 * (1.0 - mAll);   // da hơi trong (ánh hồng)',
+            '  totalEmissiveRadiance += vec3(0.5, 0.06, 0.03) * mk * 0.12 * uGlow;'].join('\n'));
     };
-    m.customProgramCacheKey = () => 'togi-body-3';
+    m.customProgramCacheKey = () => 'togi-body-anat-1' + (window.__dbgFib ? 'd' : '');
     return m;
   }
 
   // quần short: vải thể thao đen mờ có ánh sheen, cạp chun có gân, viền hông xám, mặt trong tối
   function shortsMaterial(levels, U) {
-    const m = new T.MeshPhysicalMaterial({ color: 0x18191d, roughness: 0.8, metalness: 0, sheen: 0.35, sheenRoughness: 0.6,
-      sheenColor: new T.Color(0x4a4f58), side: T.DoubleSide, envMapIntensity: 0.6 });
+    const m = new T.MeshPhysicalMaterial({ color: 0x18191d, roughness: 0.92, metalness: 0, sheen: 0.25, sheenRoughness: 0.8,
+      sheenColor: new T.Color(0x3a3d44), side: T.DoubleSide, envMapIntensity: 0.25 });
     m.extensions = { derivatives: true };
     m.onBeforeCompile = sh => {
       sh.uniforms.uLvl = { value: levels };
@@ -343,10 +357,10 @@
           .replace('#include <color_fragment>', [
             '#include <color_fragment>',
             '  float hotK = smoothstep(0.0, 0.5, vHot);',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.11, 0.115, 0.125), vBand);',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.45, 0.47, 0.51), vStripe * 0.85);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.031, 0.034), vBand);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.165, 0.18), vStripe * 0.9);',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.031, 0.034), vInner);',
-            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.035, 0.015), hotK * 0.12);',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.035, 0.015), hotK * 0.0);',
             '  diffuseColor.rgb *= mix(1.0, vAO, 0.5);'].join('\n'))
           .replace('#include <normal_fragment_maps>', [
             '#include <normal_fragment_maps>',
@@ -355,8 +369,8 @@
           .replace('#include <emissivemap_fragment>', [
             '#include <emissivemap_fragment>',
             '  float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);',
-            '  totalEmissiveRadiance += vec3(0.42, 0.66, 1.0) * rimF * 0.12 * (1.0 - vInner);',
-            '  totalEmissiveRadiance += vec3(1.0, 0.13, 0.02) * hotK * (0.025 + 0.07 * uGlow);'].join('\n'));
+            '  totalEmissiveRadiance += vec3(0.8, 0.82, 0.85) * rimF * 0.05 * (1.0 - vInner);',
+            '  totalEmissiveRadiance += vec3(1.0, 0.13, 0.02) * hotK * (0.008 + 0.022 * uGlow);'].join('\n'));
     };
     m.customProgramCacheKey = () => 'togi-shorts-1';
     return m;
@@ -677,16 +691,16 @@
   // ánh sáng môi trường kiểu studio chụp ảnh: hộp đèn mềm phía trước-trên, đèn viền xanh phía sau, sàn hắt nhẹ
   function studioEnv(renderer) {
     const env = new T.Scene();
-    env.add(new T.Mesh(new T.SphereGeometry(20, 32, 16), new T.MeshBasicMaterial({ side: T.BackSide, color: 0x2b2e34 })));
+    env.add(new T.Mesh(new T.SphereGeometry(20, 32, 16), new T.MeshBasicMaterial({ side: T.BackSide, color: 0x9a9c9e })));
     const panel = (w, h, pos, col, k) => {
       const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color(col).multiplyScalar(k), side: T.DoubleSide }));
       m.position.set(...pos); m.lookAt(0, 1, 0); env.add(m);
     };
     panel(7, 5, [3.5, 7, 6], 0xffffff, 3.2);     // hộp đèn chính
     panel(5, 3, [-6, 3, 4], 0xf1f4ff, 1.1);      // đèn phụ
-    panel(3, 8, [-6, 4, -5], 0xd2defa, 1.4);     // đèn viền trái-sau
-    panel(3, 8, [6, 4, -5], 0xd2defa, 0.9);      // đèn viền phải-sau
-    panel(30, 30, [0, -0.5, 0], 0x3a3d43, 1.0);  // sàn hắt
+    panel(3, 8, [-6, 4, -5], 0xffffff, 1.2);     // đèn viền trái-sau
+    panel(3, 8, [6, 4, -5], 0xffffff, 0.8);      // đèn viền phải-sau
+    panel(30, 30, [0, -0.5, 0], 0xe9e3dc, 1.0);  // sàn hắt (ấm, sáng)
     const pm = new T.PMREMGenerator(renderer);
     const rt = pm.fromScene(env, 0.035);
     pm.dispose();
@@ -730,27 +744,28 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.outputEncoding = T.sRGBEncoding;
-    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.98;
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
     stage.appendChild(renderer.domElement);
     const scene = new T.Scene();
-    scene.background = studioBg();
-    scene.fog = new T.Fog(COLORS.bg, 5, 14);
+    scene.background = new T.Color(COLORS.bg);
     const envTex = studioEnv(renderer);
     scene.environment = envTex;
     const cam = new T.PerspectiveCamera(32, 16 / 9, 0.05, 50);
-    scene.add(new T.HemisphereLight(0xe4ebf5, 0x2a2c30, 0.14));
-    const sun = new T.DirectionalLight(0xfffaf3, 1.2);
-    sun.position.set(2.2, 5, 3.8);
+    scene.add(new T.HemisphereLight(0xffffff, 0xd9cfc4, 0.36));
+    const sun = new T.DirectionalLight(0xfff6ee, 1.3);
+    sun.position.set(2.0, 5, 4.2);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.radius = 5; sun.shadow.bias = -0.0004;
+    sun.shadow.radius = 7; sun.shadow.bias = -0.0004;
     Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 15 });
     scene.add(sun);
-    const rim = new T.DirectionalLight(0xdbe5ff, 0.45); rim.position.set(-3, 3, -3.5); scene.add(rim);
-    const rim2 = new T.DirectionalLight(0xdbe5ff, 0.3); rim2.position.set(3.5, 2, -2.5); scene.add(rim2);
-    // sàn studio: cùng tông với nền, chỉ hiện bóng đổ mềm
-    const floor = new T.Mesh(new T.PlaneGeometry(80, 80), mat(COLORS.floor, { roughness: 0.95, metalness: 0 }));
+    const fill = new T.DirectionalLight(0xf2f5ff, 0.45); fill.position.set(-3, 2, 3); scene.add(fill);
+    const rim = new T.DirectionalLight(0xffffff, 0.5); rim.position.set(-2, 3, -4); scene.add(rim);
+    // nền trắng: sàn trong suốt chỉ giữ bóng đổ mềm; vòng tròn bạc hà nhạt phía sau người mẫu (như tranh minh hoạ)
+    const floor = new T.Mesh(new T.PlaneGeometry(80, 80), new T.ShadowMaterial({ opacity: 0.16 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    const backdrop = new T.Mesh(new T.CircleGeometry(1, 96), new T.MeshBasicMaterial({ color: COLORS.backdrop, toneMapped: false, depthWrite: false }));
+    backdrop.renderOrder = -1; scene.add(backdrop);
 
     const B = makeBody(scene, def);
     if (!B) { renderer.dispose(); root.innerHTML = ''; return null; }
@@ -765,12 +780,20 @@
 
     // camera
     const camDef = Object.assign({ az: 40, el: 10, dist: 4.3, target: [0, 0.9, 0] }, def.cam || {}, opts.cam || {});
+    // bài tập lưng: góc nhìn mặc định quay ra sau lưng để thấy rõ cơ đang tập
+    const BACK = ['lats', 'midback', 'traps', 'delts_rear', 'lower_back'];
+    if (!opts.cam && (def.focus || []).length && def.focus.every(m => BACK.includes(m)) && Math.abs(((camDef.az + 540) % 360) - 180) < 90) camDef.az = 180 - camDef.az;
     let az = camDef.az, el = camDef.el;
     const target = V(...camDef.target);
     function placeCam() {
       const d = camDef.dist * (opts.zoom || 1) * (cam.aspect < 1.5 ? 1.12 : 1); // khung 4:3 trên điện thoại → lùi camera chút
       cam.position.set(target.x + d * Math.cos(el * DEG) * Math.sin(az * DEG), target.y + d * Math.sin(el * DEG), target.z + d * Math.cos(el * DEG) * Math.cos(az * DEG));
       cam.lookAt(target);
+      // vòng tròn nền: luôn ở sau người mẫu, quay về phía camera, chiếm ~85% chiều cao khung
+      const back = cam.position.clone().sub(target).normalize().multiplyScalar(-2.2);
+      backdrop.position.copy(target).add(back);
+      backdrop.lookAt(cam.position);
+      backdrop.scale.setScalar(0.43 * 2 * (d + 2.2) * Math.tan(cam.fov / 2 * DEG) * Math.min(1, cam.aspect * 1.05));
     }
     placeCam();
 

@@ -346,8 +346,8 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 .ex-media { position: relative; display: block; width: 100%; }
 .ex-media-btn { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: inherit; font: inherit; }
 .ex-media .ph { aspect-ratio: 16 / 10; }
-.ph-3d { background: #2a2d32; }
-.ex-media.is-live, .strip-wrap.is-live { background: #2a2d32; }
+.ph-3d { background: #f3f5f4; }
+.ex-media.is-live, .strip-wrap.is-live { background: #f3f5f4; }
 .strip-wrap.is-live { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
 .ex-num {
   position: absolute; left: 10px; top: 10px; width: 36px; height: 36px; border-radius: 10px;
@@ -475,8 +475,8 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 .msec-warn h3 { color: var(--amber); }
 .poses { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .poses figure { margin: 0; border-radius: 12px; overflow: hidden; background: var(--bg-2); border: 1px solid var(--line); }
-.poses img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #2a2d32; display: block; }
-.musmap { margin: 0 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #2a2d32; }
+.poses img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #f3f5f4; display: block; }
+.musmap { margin: 0 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #f3f5f4; }
 .musmap img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
 .musmap figcaption { padding: 8px 12px; font-size: 13px; color: var(--ink-2, #c9d6ea); background: var(--bg-2); }
 .lg { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin: 0 5px 0 0; vertical-align: -1px; }
@@ -620,7 +620,7 @@ td.num { white-space: nowrap; }
 .vp-fail b { color: var(--amber); }
 
 /* ── trình phát hoạt hình 3D ── */
-.a3 { position: relative; background: #2a2d32; }
+.a3 { position: relative; background: #f3f5f4; }
 .a3-stage { width: 100%; cursor: grab; }
 .a3-stage:active { cursor: grabbing; }
 .a3-stage canvas { display: block; }
