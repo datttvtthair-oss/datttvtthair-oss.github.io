@@ -114,6 +114,26 @@
     return out;
   }
   const ease = t => 0.5 - 0.5 * Math.cos(Math.PI * t);
+  const samePose = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
+  // spline Catmull–Rom qua p0 p1 p2 p3 (chạy từ p1 → p2), chặn vọt quá 15% để tay không xuyên dụng cụ
+  function splinePose(p0, p1, p2, p3, u) {
+    if (samePose(p1, p2)) return p1;
+    const out = {}, u2 = u * u, u3 = u2 * u;
+    const cr = (a, b, c, d) => {
+      const v = 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (3 * b - a - 3 * c + d) * u3);
+      const lo = Math.min(b, c), hi = Math.max(b, c), m = (hi - lo) * 0.15;
+      return Math.max(lo - m, Math.min(hi + m, v));
+    };
+    const keysAll = new Set([...Object.keys(p1), ...Object.keys(p2)]);
+    keysAll.forEach(k => {
+      const b = p1[k] !== undefined ? p1[k] : p2[k], c = p2[k] !== undefined ? p2[k] : p1[k];
+      const a = p0[k] !== undefined ? p0[k] : b, d = p3[k] !== undefined ? p3[k] : c;
+      if (Array.isArray(b)) out[k] = b.map((v, i) => cr(Array.isArray(a) && a[i] !== undefined ? a[i] : v, v, c[i] !== undefined ? c[i] : v, Array.isArray(d) && d[i] !== undefined ? d[i] : (c[i] !== undefined ? c[i] : v)));
+      else if (typeof b === 'number') out[k] = cr(typeof a === 'number' ? a : b, b, typeof c === 'number' ? c : b, typeof d === 'number' ? d : c);
+      else out[k] = u < 0.5 ? b : c;
+    });
+    return out;
+  }
 
   /* ── thư viện giúp viết tư thế ── */
   const lib = {
@@ -316,6 +336,10 @@
       const uT = kn.clone().sub(hp), uS = an.clone().sub(kn);
       F0['th' + s] = inv(basis(hp, uT, V(0, 0, 1))); len0['th' + s] = uT.length();
       F0['sk' + s] = inv(basis(kn, uS, V(0, 0, 1))); len0['sk' + s] = uS.length();
+      F0['thRot' + s] = new T.Quaternion().setFromRotationMatrix(basis(V(0, 0, 0), uT, V(0, 0, 1)));
+      F0['skRot' + s] = new T.Quaternion().setFromRotationMatrix(basis(V(0, 0, 0), uS, V(0, 0, 1)));
+      F0['eb' + s] = new T.Matrix4().setPosition(el.clone().negate());
+      F0['kb' + s] = new T.Matrix4().setPosition(kn.clone().negate());
       const fw = R['toe' + s].clone().sub(an); fw.y = 0;
       F0['ft' + s] = inv(basis(an, fw, V(0, 1, 0)));
       F0['dl' + s] = new T.Matrix4().setPosition(sh.clone().negate());
@@ -327,13 +351,25 @@
   }
 
   // da người thật; nhóm cơ đang tập hiện thớ cơ đỏ như tranh giải phẫu (cơ phụ: thớ cơ mờ hơn)
+  const BULGE_GLSL = [
+    'attribute vec2 mus;', 'attribute vec2 mInt;', 'uniform vec4 uFlex;', 'uniform vec4 uFlex2;',
+    'float wOf(float id) { return (abs(mus.x - id) < 0.5 ? mInt.x : 0.0) + (abs(mus.y - id) < 0.5 ? mInt.y : 0.0); }',
+    // cơ co thì phồng: bắp tay trước khi gập khuỷu, tay sau khi duỗi, đùi sau khi gập gối, bắp chân khi nhón, ngực khi khép tay
+    'float muscleBulge() {',
+    '  float sl = position.x > 0.0 ? 1.0 : 0.0;',
+    '  float fE = mix(uFlex.y, uFlex.x, sl), fK = mix(uFlex.w, uFlex.z, sl), fC = mix(uFlex2.y, uFlex2.x, sl), fP = mix(uFlex2.w, uFlex2.z, sl);',
+    '  return smoothstep(0.25, 1.0, wOf(10.0)) * 0.0075 * fE + wOf(12.0) * 0.003 * fE + smoothstep(0.25, 1.0, wOf(11.0)) * 0.004 * (1.0 - fE) + smoothstep(0.25, 1.0, wOf(15.0)) * 0.006 * fK',
+    '       + wOf(14.0) * 0.003 * (1.0 - fK) + smoothstep(0.25, 1.0, wOf(17.0)) * 0.007 * fC + smoothstep(0.25, 1.0, wOf(0.0)) * 0.005 * fP;',
+    '}'].join('\n') + '\n';
+
   function bodyMaterial(levels, U) {
     const m = new T.MeshStandardMaterial({ color: COLORS.body, roughness: 0.55, metalness: 0.0, envMapIntensity: 0.55 });
     m.extensions = { derivatives: true };
     m.onBeforeCompile = sh => {
       sh.uniforms.uLvl = { value: levels };
       sh.uniforms.uGlow = U.glow;
-      sh.vertexShader = 'attribute vec2 mus;\nattribute vec2 mInt;\nattribute float shorts;\nattribute float ao;\nattribute float fs;\nattribute float fa;\nattribute float lines;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\nvarying float vS;\nvarying float vSa;\nvarying float vLine;\n' +
+      sh.uniforms.uFlex = U.flex; sh.uniforms.uFlex2 = U.flex2;
+      sh.vertexShader = BULGE_GLSL + 'attribute float shorts;\nattribute float ao;\nattribute float fs;\nattribute float fa;\nattribute float lines;\nuniform float uLvl[18];\nuniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\nvarying float vS;\nvarying float vSa;\nvarying float vLine;\nvarying float vFore;\nvarying float vBic;\n' +
         sh.vertexShader.replace('#include <begin_vertex>', [
           '#include <begin_vertex>',
           '  int m1 = int(mus.x + 0.5); int m2 = int(mus.y + 0.5);',
@@ -346,8 +382,9 @@
           '  vLine = lines;',
           '  vS = fs;   // toạ độ vuông góc thớ cơ (tính sẵn theo từng cơ)',
           '  vSa = fa;  // toạ độ dọc thớ cơ',
-          '  transformed += objectNormal * (vHot * uGlow * 0.003);'].join('\n'));
-      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\nvarying float vS;\nvarying float vSa;\nvarying float vLine;\n' +
+          '  transformed += objectNormal * (vHot * uGlow * 0.003 + muscleBulge());',
+          '  vFore = wOf(12.0); vBic = wOf(10.0);'].join('\n'));
+      sh.fragmentShader = 'uniform float uGlow;\nvarying float vHot;\nvarying float vWarm;\nvarying float vShorts;\nvarying float vAO;\nvarying float vS;\nvarying float vSa;\nvarying float vLine;\nvarying float vFore;\nvarying float vBic;\n' +
         'vec3 bumpN(vec3 p, vec3 n, float h) { vec3 sx = dFdx(p); vec3 sy = dFdy(p); vec3 r1 = cross(sy, n); vec3 r2 = cross(n, sx); float det = dot(sx, r1); vec2 dh = vec2(dFdx(h), dFdy(h)); vec3 gr = sign(det) * (dh.x * r1 + dh.y * r2); return normalize(abs(det) * n - gr); }\n' +
         sh.fragmentShader
           .replace('#include <color_fragment>', [
@@ -367,23 +404,31 @@
             '  float mAll = max(mk, mw);',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, musC * mix(1.0, vAO, 0.4) * (1.0 - 0.25 * edge), mAll);',
             '  diffuseColor.rgb *= 1.0 - 0.24 * smoothstep(0.25, 0.8, vLine);   // đường nét giải phẫu',
+            '  float vein = 0.0;',
+            '  for (int k = 0; k < 3; k++) { float fk = float(k); float c = -0.024 + 0.025 * fk + 0.005 * sin(vSa * 35.0 + fk * 2.1) + 0.0025 * sin(vSa * 95.0 + fk);',
+            '    vein = max(vein, 1.0 - smoothstep(0.0012, 0.0032, abs(vS - c))); }',
+            '  vein = max(vein, (1.0 - smoothstep(0.0012, 0.003, abs(vS - 0.004 - (vSa - 0.12) * 0.3))) * step(0.06, vSa) * step(vSa, 0.16));',
+            '  float vm = (smoothstep(0.3, 0.6, vFore) * smoothstep(0.03, 0.06, vSa) * (1.0 - smoothstep(0.19, 0.23, vSa))',
+            '    + smoothstep(0.4, 0.7, vBic) * step(0.012, vS) * step(vS, 0.03) * smoothstep(0.1, 0.13, vSa) * (1.0 - smoothstep(0.22, 0.25, vSa))) * (1.0 - mAll);',
+            '  vein *= clamp(vm, 0.0, 1.0) * (1.0 - smoothstep(0.003, 0.008, fwidth(vS)));',
+            '  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.84, 0.9), vein * 0.6);',
             '  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.047, 0.052), smoothstep(0.85, 1.0, vShorts));',
             window.__dbgFib ? '  diffuseColor.rgb = vec3(fract(vS * 40.0), faa, stripe);' : ''].join('\n'))
           .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  reflectedLight.indirectDiffuse *= vAO;\n  reflectedLight.indirectSpecular *= vAO * vAO;')
           .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.5, mAll);\n  roughnessFactor = mix(roughnessFactor, 0.85, smoothstep(0.85, 1.0, vShorts));')
-          .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = bumpN(-vViewPosition, normal, (stripe - 0.5) * 0.00028 * mAll);')
+          .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = bumpN(-vViewPosition, normal, (stripe - 0.5) * 0.00028 * mAll + vein * 0.0016);')
           .replace('#include <emissivemap_fragment>', [
             '#include <emissivemap_fragment>',
             '  totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.5, 0.4) * 0.05 * (1.0 - mAll);   // da hơi trong (ánh hồng)',
             '  totalEmissiveRadiance += vec3(0.5, 0.06, 0.03) * mk * 0.12 * uGlow;'].join('\n'));
     };
-    m.customProgramCacheKey = () => 'togi-body-anat-2' + (window.__dbgFib ? 'd' : '');
+    m.customProgramCacheKey = () => 'togi-body-anat-3' + (window.__dbgFib ? 'd' : '');
     return m;
   }
 
   // quần short: vải thể thao đen mờ có ánh sheen, cạp chun có gân, viền hông xám, mặt trong tối
   function shortsMaterial(levels, U) {
-    const m = new T.MeshPhysicalMaterial({ color: 0x18191d, roughness: 0.96, metalness: 0, sheen: 0.12, sheenRoughness: 0.9,
+    const m = new T.MeshPhysicalMaterial({ color: 0x18191d, roughness: 0.96, metalness: 0, sheen: 0.0, sheenRoughness: 0.9,
       sheenColor: new T.Color(0x34373d), side: T.DoubleSide, envMapIntensity: 0.12 });
     m.extensions = { derivatives: true };
     m.onBeforeCompile = sh => {
@@ -431,12 +476,13 @@
     return V(-sg * spec[0], spec[1], spec[2]).applyQuaternion(J.qb);
   }
 
-  function outlineMaterial(color, w) {
+  function outlineMaterial(color, w, U, bulge) {
     const m = new T.MeshBasicMaterial({ color, side: T.BackSide });
     m.onBeforeCompile = sh => {
-      sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed += normalize(objectNormal) * ' + w.toFixed(4) + ';');
+      if (bulge) { sh.uniforms.uFlex = U.flex; sh.uniforms.uFlex2 = U.flex2; sh.vertexShader = BULGE_GLSL + sh.vertexShader; }
+      sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed += normalize(objectNormal) * (' + w.toFixed(4) + (bulge ? ' + muscleBulge()' : '') + ');');
     };
-    m.customProgramCacheKey = () => 'togi-outline-' + w;
+    m.customProgramCacheKey = () => 'togi-outline-' + w + (bulge ? 'b' : '');
     return m;
   }
 
@@ -444,7 +490,7 @@
     const D = bodyData();
     if (!D) return null;
     const lv = MUSCLES.map(m => (def.focus || []).includes(m) ? 1 : (def.assist || []).includes(m) ? 0.5 : 0);
-    const U = { glow: { value: 0.3 } };
+    const U = { glow: { value: 0.3 }, flex: { value: new T.Vector4() }, flex2: { value: new T.Vector4() } };
     const bones = D.names.map(() => { const b = new T.Bone(); b.matrixAutoUpdate = false; return b; });
     const skel = new T.Skeleton(bones, bones.map(() => new T.Matrix4()));
     const mesh = new T.SkinnedMesh(D.geo, bodyMaterial(lv, U));
@@ -453,7 +499,7 @@
     scene.add(mesh);
     [[D.geoOut || D.geo, 0x3b2216, 0.0021], [D.geoS, 0x050506, 0.0024]].forEach(([g, c, w]) => { // đường viền
       if (!g) return;
-      const ol = new T.SkinnedMesh(g, outlineMaterial(c, w));
+      const ol = new T.SkinnedMesh(g, outlineMaterial(c, w, U, g !== D.geoS));
       ol.bind(skel, new T.Matrix4()); ol.frustumCulled = false;
       scene.add(ol);
     });
@@ -476,8 +522,10 @@
   function updateBody(B, J, glow, pose) {
     const { D, bones } = B, F0 = D.F0;
     setBone(bones.hips, _F.makeRotationFromQuaternion(J.q).setPosition(J.pel), 1, F0.hips);
-    setBone(bones.chest, _F.makeRotationFromQuaternion(J.qb).setPosition(J.mid), (L.spine / 2) / (D.R.chest.y - D.R.mid.y), F0.chest);
+    _S.makeScale(1 + 0.011 * (J.breath || 0), (L.spine / 2) / (D.R.chest.y - D.R.mid.y), 1 + 0.016 * (J.breath || 0));
+    bones.chest.matrixWorld.copy(_F.makeRotationFromQuaternion(J.qb).setPosition(J.mid)).multiply(_S).multiply(F0.chest);
     setBone(bones.head, _F.makeRotationFromQuaternion(J.qh).setPosition(J.neck), 1, F0.head);
+    const flex = [0, 0, 0, 0], flex2 = [0, 0, 0, 0];
     for (const s of ['L', 'R']) {
       const sh = J['sh' + s], el = J['elb' + s], wr = J['wr' + s];
       const uA = el.clone().sub(sh), uF = wr.clone().sub(el), uFn = uF.clone().normalize();
@@ -492,6 +540,9 @@
       const z0 = perp(frA, uFn);
       basis(el, uF, z0, _F);
       setBone(bones['fo' + s], _F, kF, F0['fo' + s]);
+      // khuỷu: xương phụ xoay nửa góc giữa cánh tay và cẳng tay → khớp gập tròn, không móp
+      const foQ = new T.Quaternion().setFromRotationMatrix(_F).multiply(F0['foRot' + s].clone().invert());
+      bones['eb' + s].matrixWorld.makeRotationFromQuaternion(upQ.clone().slerp(foQ, 0.5)).setPosition(el).multiply(F0['eb' + s]);
       // lòng bàn tay quay đúng kiểu cầm của bài (ngửa / úp / khép vào trong); độ xoay chia đều dọc cẳng tay
       let ang = 0;
       const want = B.palm ? palmTarget(B.palm, s, J, z0) : null;
@@ -510,10 +561,22 @@
       const hp = J['hip' + s], kn = J['knee' + s], an = J['ank' + s];
       const uT = kn.clone().sub(hp), uS = an.clone().sub(kn);
       setBone(bones['th' + s], basis(hp, uT, J['kp' + s], _F), uT.length() / D.len0['th' + s], F0['th' + s]);
+      const thQ = new T.Quaternion().setFromRotationMatrix(basis(V(0, 0, 0), uT, J['kp' + s], _F)).multiply(F0['thRot' + s].clone().invert());
       setBone(bones['sk' + s], basis(kn, uS, J['kp' + s], _F), uS.length() / D.len0['sk' + s], F0['sk' + s]);
+      const skQ = new T.Quaternion().setFromRotationMatrix(_F).multiply(F0['skRot' + s].clone().invert());
+      bones['kb' + s].matrixWorld.makeRotationFromQuaternion(thQ.slerp(skQ, 0.5)).setPosition(kn).multiply(F0['kb' + s]);
+      // độ co cơ: gập khuỷu, gập gối, nhón gót, khép tay ra trước
+      const i0 = s === 'L' ? 0 : 1, sg = s === 'L' ? 1 : -1;
+      flex[i0] = Math.min(1, Math.max(0, Math.acos(Math.max(-1, Math.min(1, uA.clone().normalize().dot(uFn)))) / 2.3));
+      flex[2 + i0] = Math.min(1, Math.max(0, Math.acos(Math.max(-1, Math.min(1, uT.clone().normalize().dot(uS.clone().normalize())))) / 2.2));
+      const ft = J['toe' + s].clone().sub(J['heel' + s]).normalize();
+      flex2[i0] = Math.min(1, Math.max(0, -ft.y * 2.5));
+      const ua = uA.clone().normalize();
+      flex2[2 + i0] = Math.min(1, Math.max(0, ua.dot(V(0, 0, 1).applyQuaternion(J.qb)) * 0.9 + ua.dot(V(-sg, 0, 0).applyQuaternion(J.qb)) * 0.7));
       setBone(bones['ft' + s], basis(an, J['toe' + s].clone().sub(J['heel' + s]), V(0, 1, 0), _F), 1, F0['ft' + s]);
     }
     B.U.glow.value = glow;
+    B.U.flex.value.set(...flex); B.U.flex2.value.set(...flex2);
   }
 
   /* ── đường sáng chỉ quỹ đạo đúng (như ảnh mẫu): tay / chân / thân đang làm việc ── */
@@ -565,16 +628,35 @@
     const steel = mat(COLORS.steel, { metalness: 0.5, roughness: 0.4 });
     const dark = mat(COLORS.dark), pad = mat(COLORS.pad), plate = mat(COLORS.plate, { roughness: 0.5 }), chrome = mat(COLORS.chrome, { metalness: 0.8, roughness: 0.25 });
     const out = [];
-    const box = (w, h, d, m) => { const me = new T.Mesh(new T.BoxGeometry(w, h, d), m); me.castShadow = true; me.receiveShadow = true; scene.add(me); return me; };
+    const box = (w, h, d, m) => { const me = new T.Mesh(m === pad ? rboxG(w, h, d, 0.03) : new T.BoxGeometry(w, h, d), m); me.castShadow = true; me.receiveShadow = true; scene.add(me); return me; };
+    const frame = mat(0x9aa1ab, { metalness: 0.65, roughness: 0.32 }), rubber = mat(0x1b1c1f, { roughness: 0.82 });
+    // khối bo tròn (đệm da, chân cao su): w × h × d, bán kính góc r
+    function rboxG(w, h, d, r) {
+      const b = Math.max(0.002, Math.min(r, h / 2 - 0.001, w / 2 - 0.002, d / 2 - 0.002)), w0 = w - 2 * b, d0 = d - 2 * b, rr = Math.max(0.004, Math.min(r * 1.4, w0 / 2 - 0.001, d0 / 2 - 0.001));
+      const sp = new T.Shape(), x = w0 / 2, z = d0 / 2;
+      sp.moveTo(-x + rr, -z); sp.lineTo(x - rr, -z); sp.quadraticCurveTo(x, -z, x, -z + rr); sp.lineTo(x, z - rr); sp.quadraticCurveTo(x, z, x - rr, z);
+      sp.lineTo(-x + rr, z); sp.quadraticCurveTo(-x, z, -x, z - rr); sp.lineTo(-x, -z + rr); sp.quadraticCurveTo(-x, -z, -x + rr, -z);
+      const g = new T.ExtrudeGeometry(sp, { depth: Math.max(0.001, h - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 4, curveSegments: 5 });
+      g.rotateX(-Math.PI / 2); g.computeBoundingBox();
+      const c = g.boundingBox.getCenter(V()); g.translate(-c.x, -c.y, -c.z); g.computeVertexNormals();
+      return g;
+    }
+    const part = (geo, m, parent) => { const me = new T.Mesh(geo, m); me.castShadow = true; me.receiveShadow = true; (parent || scene).add(me); return me; };
     const cylM = (r, m, seg) => { const me = new T.Mesh(new T.CylinderGeometry(r, r, 1, seg || 16), m); me.castShadow = true; scene.add(me); return me; };
 
     function dumbbell(len) {
       const g = new T.Group();
-      const bar = new T.Mesh(new T.CylinderGeometry(0.016, 0.016, len, 12), chrome);
-      g.add(bar);
+      g.add(new T.Mesh(new T.CylinderGeometry(0.0155, 0.0155, len, 18), chrome));
+      const knurl = new T.Mesh(new T.CylinderGeometry(0.0165, 0.0165, len * 0.42, 18), mat(0x8d949e, { metalness: 0.75, roughness: 0.55 }));
+      g.add(knurl);
+      const hex = new T.Shape(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; const px = Math.cos(a) * 0.052, py = Math.sin(a) * 0.052; i ? hex.lineTo(px, py) : hex.moveTo(px, py); }
+      const hg = new T.ExtrudeGeometry(hex, { depth: 0.06, bevelEnabled: true, bevelThickness: 0.007, bevelSize: 0.006, bevelSegments: 3 });
+      hg.rotateX(Math.PI / 2); hg.computeBoundingBox(); hg.translate(...hg.boundingBox.getCenter(V()).negate().toArray()); hg.computeVertexNormals();
+      const rubberHead = mat(0x1c1d21, { roughness: 0.7 });
       for (const s of [-1, 1]) {
-        const h = new T.Mesh(new T.CylinderGeometry(0.055, 0.055, 0.075, 8), plate);
-        h.position.y = s * (len / 2 - 0.02); g.add(h);
+        const h = new T.Mesh(hg, rubberHead); h.position.y = s * (len / 2 - 0.03); g.add(h);
+        const cap = new T.Mesh(new T.CylinderGeometry(0.022, 0.022, 0.004, 20), chrome); cap.position.y = s * (len / 2 + 0.008); g.add(cap);
+        const col = new T.Mesh(new T.CylinderGeometry(0.024, 0.024, 0.012, 20), chrome); col.position.y = s * (len / 2 - 0.074); g.add(col);
       }
       g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       scene.add(g); return g;
@@ -716,20 +798,26 @@
       } else if (t === 'mat') {
         const me = box(d.size ? d.size[0] : 0.7, 0.012, d.size ? d.size[1] : 1.9, mat(COLORS.mat)); me.position.set(...(d.pos || [0, 0.006, 0]));
         if (d.rotY) me.rotation.y = d.rotY * DEG;
-      } else if (t === 'bench') { // ghế: đệm ngồi + (tuỳ chọn) lưng dốc
-        const h = d.h || 0.45;
-        const seat = box(d.w || 0.3, 0.07, d.seat || 1.2, pad);
-        seat.position.set(d.pos[0], h, d.pos[2]);
-        if (d.rotY) seat.rotation.y = d.rotY * DEG;
-        const leg1 = box(0.06, h - 0.04, 0.06, steel); leg1.position.set(d.pos[0], (h - 0.04) / 2, d.pos[2] - (d.seat || 1.2) / 2 + 0.1);
-        const leg2 = box(0.06, h - 0.04, 0.06, steel); leg2.position.set(d.pos[0], (h - 0.04) / 2, d.pos[2] + (d.seat || 1.2) / 2 - 0.1);
+      } else if (t === 'bench') { // ghế: đệm da bo tròn + khung thép chân chữ T + (tuỳ chọn) lưng dốc
+        const h = d.h || 0.45, W = d.w || 0.3, Ls = d.seat || 1.2;
+        const grp = new T.Group(); grp.position.set(d.pos[0], 0, d.pos[2]); if (d.rotY) grp.rotation.y = d.rotY * DEG; scene.add(grp);
+        part(rboxG(W, 0.075, Ls, 0.032), pad, grp).position.set(0, h, 0);
+        part(new T.BoxGeometry(0.055, 0.045, Math.max(0.2, Ls - 0.16)), frame, grp).position.set(0, h - 0.06, 0);
+        const feet = Ls > 0.5 ? [-(Ls / 2 - 0.12), Ls / 2 - 0.12] : [0];
+        feet.forEach(z => {
+          part(new T.BoxGeometry(0.05, h - 0.1, 0.05), frame, grp).position.set(0, (h - 0.1) / 2 + 0.04, z);
+          part(new T.BoxGeometry(Math.max(0.42, W + 0.2), 0.045, 0.06), frame, grp).position.set(0, 0.045, z);
+          for (const sx of [-1, 1]) part(rboxG(0.06, 0.035, 0.075, 0.012), rubber, grp).position.set(sx * (Math.max(0.42, W + 0.2) / 2 - 0.02), 0.018, z);
+        });
         if (d.back) { // lưng ghế: dài back, góc incline so với phương ngang, bắt đầu từ mép sau đệm
-          const bk = box(d.w || 0.3, 0.07, d.back, pad);
-          const ang = d.incline * DEG;
-          const z0 = d.pos[2] + (d.backAt != null ? d.backAt : -(d.seat || 1.2) / 2);
-          const dirZ = d.backDir || -1;
-          bk.position.set(d.pos[0], h + Math.sin(ang) * d.back / 2, z0 + dirZ * Math.cos(ang) * d.back / 2);
+          const ang = d.incline * DEG, dirZ = d.backDir || -1;
+          const z0 = d.backAt != null ? d.backAt : -Ls / 2;
+          const bk = part(rboxG(W, 0.075, d.back, 0.032), pad, grp);
+          bk.position.set(0, h + Math.sin(ang) * d.back / 2, z0 + dirZ * Math.cos(ang) * d.back / 2);
           bk.rotation.x = -dirZ * ang;
+          const st = part(new T.BoxGeometry(0.045, 0.045, 1), frame, grp); // thanh chống lưng ghế
+          const a0 = V(0, 0.07, z0 + dirZ * 0.05), a1 = V(0, h + Math.sin(ang) * d.back * 0.55 - 0.06, z0 + dirZ * Math.cos(ang) * d.back * 0.55);
+          st.position.copy(a0).add(a1).multiplyScalar(0.5); st.scale.z = a0.distanceTo(a1); st.lookAt(grp.localToWorld(a1.clone()));
         }
       }
     });
@@ -863,9 +951,11 @@
       for (let i = 0; i < keys.length; i++) {
         const k = keys[i];
         if (time <= acc + k.d || i === keys.length - 1) {
-          const prev = keys[(i - 1 + keys.length) % keys.length].p;
+          const n = keys.length, at = j => keys[((j % n) + n) % n].p;
           const u = k.d > 0 ? Math.min(1, Math.max(0, (time - acc) / k.d)) : 1;
-          return { pose: lerpPose(prev, k.p, ease(u)), cap: k.cap, idx: i };
+          const ue = u + (ease(u) - u) * 0.45; // vẫn chậm lại chút ở đầu/cuối mỗi nhịp, nhưng không dừng hẳn
+          if (window.__noSpline) return { pose: lerpPose(at(i - 1), k.p, ease(u)), cap: k.cap, idx: i, u: ease(u) };
+          return { pose: splinePose(at(i - 2), at(i - 1), k.p, at(i + 1), ue), cap: k.cap, idx: i, u: ue };
         }
         acc += k.d;
       }
@@ -875,9 +965,49 @@
     // nhịp gắng sức (phụ đề có "thở ra" hoặc "giữ") → cơ đang tập sáng mạnh, phồng nhẹ
     const effortOf = cap => (/thở ra|giữ|Giữ|Siết|siết/.test(cap) ? 1 : 0.22);
     let lastJ = null;
+    // nội suy theo góc khớp: cánh tay / cẳng tay, đùi / cẳng chân xoay quanh khớp (cổ tay, cổ chân đi theo cung tròn như người thật);
+    // tay / chân đang cố định (cùng vị trí ở hai tư thế) thì giữ nguyên chỗ
+    const keyJ = keys.map(() => null);
+    const solvedKey = j => { const n = keys.length, jj = ((j % n) + n) % n; return keyJ[jj] || (keyJ[jj] = solve(keys[jj].p)); };
+    const crV = (a, b, c, d, u) => {
+      const u2 = u * u, u3 = u2 * u, f = (A, B, C, D) => 0.5 * (2 * B + (C - A) * u + (2 * A - 5 * B + 4 * C - D) * u2 + (3 * B - A - 3 * C + D) * u3);
+      return V(f(a.x, b.x, c.x, d.x), f(a.y, b.y, c.y, d.y), f(a.z, b.z, c.z, d.z)).normalize();
+    };
+    function jointSpace(pose, idx, u) {
+      if (keys.length < 2 || window.__noSpline) return pose;
+      const Jc = solve(pose), K = [solvedKey(idx - 2), solvedKey(idx - 1), solvedKey(idx), solvedKey(idx + 1)], out = Object.assign({}, pose);
+      const chain = (s, root, mid, end, l1, l2, tKey, pKey) => {
+        if (K[1][end + s].distanceTo(K[2][end + s]) < 0.01) return;
+        const d1 = K.map(k => k[mid + s].clone().sub(k[root + s]).normalize()), d2 = K.map(k => k[end + s].clone().sub(k[mid + s]).normalize());
+        const a = crV(d1[0], d1[1], d1[2], d1[3], u), b = crV(d2[0], d2[1], d2[2], d2[3], u);
+        const r0 = Jc[root + s], m = r0.clone().addScaledVector(a, l1), e = m.clone().addScaledVector(b, l2);
+        const dir = e.clone().sub(r0).normalize(), pole = m.clone().sub(r0);
+        pole.sub(dir.multiplyScalar(pole.dot(dir)));
+        if (pole.lengthSq() < 1e-6) return;
+        out[tKey + s] = [e.x, e.y, e.z]; out[pKey + s] = [pole.x, pole.y, pole.z];
+        delete out[tKey + s + 't']; delete out[pKey + s + 't']; if (tKey === 'w') delete out['h' + s];
+      };
+      for (const s of ['L', 'R']) {
+        chain(s, 'sh', 'elb', 'wr', L.upper, L.fore, 'w', 'e');
+        chain(s, 'hip', 'knee', 'ank', L.thigh, L.shank, 'a', 'k');
+      }
+      return out;
+    }
+    function alive(pose, time) {
+      if (def.still || window.__noAlive) return { pose, breath: 0 };
+      const b = time * 2 * Math.PI / 3.6, q = Object.assign({}, pose);
+      q.tr = (pose.tr || [0, 0, 0]).slice(); q.tr[0] += 0.5 * Math.sin(b); q.tr[2] += 0.35 * Math.sin(b * 0.5 + 1);
+      q.hd = (pose.hd || 0) + 0.9 * Math.sin(b + 0.8);
+      if (pose.pel && pose.pel[1] > STAND_Y - 0.12 && !def.still) { // đứng: dồn trọng tâm rất nhẹ sang hai bên
+        q.pel = pose.pel.slice(); q.pel[0] += 0.004 * Math.sin(b * 0.5); q.pel[1] -= 0.002 * (1 + Math.sin(b));
+      }
+      return { pose: q, breath: Math.sin(b) };
+    }
     function draw(instant) {
-      const r = poseAt(t);
+      const r0 = poseAt(t), live = alive(jointSpace(r0.pose, r0.idx, r0.u), t);
+      const r = { pose: live.pose, cap: r0.cap, idx: r0.idx };
       const J = solve(r.pose);
+      J.breath = live.breath;
       const target = effortOf(r.cap);
       glow = instant ? target : glow + (target - glow) * 0.08;
       lastJ = J;

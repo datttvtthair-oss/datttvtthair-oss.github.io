@@ -523,8 +523,8 @@
   /* ───────── Cuốn tạ đơn tay trước ───────── */
   {
     const base = P(feet(0.13, 6, 0), pron, { pel: [0, UP, 0], tr: [2, 0, 0] });
-    const bot = P(base, both('w', [0.21, 0.83, 0.05]), both('e', [0.1, -1, -0.4]));
-    const top = P(base, both('w', [0.21, 1.27, 0.17]), both('e', [0.1, -1, -0.4]));
+    const bot = P(base, both('w', [0.21, 0.83, 0.07]), both('e', [0.1, -1, -0.08]));
+    const top = P(base, both('w', [0.21, 1.27, 0.19]), both('e', [0.1, -1, -0.08]));   // khuỷu ghim ngay dưới vai
     A.define('biceps-curl', {
       cam: { az: 68, el: 6, dist: 4.1, target: [0, 1.0, 0] },
       focus: ['arm'],
@@ -541,8 +541,8 @@
   /* ───────── Cuốn cáp tay trước ───────── */
   {
     const base = P(feet(0.13, 6, 0), { pel: [0, UP, 0], tr: [2, 0, 0] });
-    const bot = P(base, both('w', [0.17, 0.83, 0.12]), both('e', [0.1, -1, -0.4]));
-    const top = P(base, both('w', [0.17, 1.25, 0.2]), both('e', [0.1, -1, -0.4]));
+    const bot = P(base, both('w', [0.17, 0.83, 0.12]), both('e', [0.1, -1, -0.08]));
+    const top = P(base, both('w', [0.17, 1.25, 0.21]), both('e', [0.1, -1, -0.08]));
     A.define('cable-curl', {
       cam: { az: 70, el: 8, dist: 4.2, target: [0, 0.95, 0.2] },
       focus: ['arm'],
