@@ -1,4 +1,4 @@
-/* Giao diện giáo án. Đọc dữ liệu từ PLAN / EXERCISES, người mẫu 3D từ Anim3D, lưu qua Store. */
+/* Giao diện giáo án. Đọc dữ liệu từ PLAN / EXERCISES, video dựng 3D trong video/<bài>.mp4 (ảnh img/3d), lưu qua Store. */
 (function () {
   'use strict';
   const P = window.PLAN, EX = window.EXERCISES;
@@ -26,7 +26,8 @@
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6L20.1 8.4 18.7 7z"/></svg>',
     clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7z"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>',
-    ext: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.6l-9.8 9.8 1.4 1.4L19 6.4V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg>'
+    ext: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.6l-9.8 9.8 1.4 1.4L19 6.4V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>'
   };
   const ART = {
     court: '<svg viewBox="0 0 160 100" aria-hidden="true"><rect width="160" height="100" fill="#0d1d3a"/><g fill="none" stroke="#22d3ee" stroke-opacity=".55" stroke-width="1.6"><rect x="8" y="8" width="144" height="84"/><line x1="80" y1="8" x2="80" y2="92"/><circle cx="80" cy="50" r="14"/><path d="M8 26h26v48H8M152 26h-26v48h26"/><path d="M8 14a52 36 0 0 1 0 72M152 14a52 36 0 0 0 0 72"/></g><circle cx="80" cy="50" r="8" fill="#ff8a3d"/><path d="M72 50h16M80 42v16" stroke="#0d1d3a" stroke-width="1.2"/></svg>',
@@ -193,7 +194,15 @@
     return `<span class="ph ph-art ${cls || ''}">${ART[e.art] || ART.court}</span>`;
   }
 
-  function hasVideo(id) { return !!(EX[id] && window.Anim3D && Anim3D.has(id)); }
+  function hasVideo(id) { return !!(EX[id] && !EX[id].art); }
+
+  /* video dựng 3D: tự chạy, lặp, không tiếng; nút dừng + chậm 0,5× */
+  function videoHTML(id, extra, cap) {
+    const e = EX[id];
+    return `<div class="vbox"><video src="video/${id}.mp4" poster="img/3d/${id}-0.jpg" autoplay muted loop playsinline preload="auto" aria-label="Video: ${esc(e.vi)}"></video>
+      ${cap ? `<span class="vcap">${esc(cap)}</span>` : ''}
+      <div class="vbar"><button type="button" class="vbtn" data-act="v-pause" aria-pressed="false" aria-label="Tạm dừng / chạy tiếp">${ICON.pause}</button><button type="button" class="vbtn" data-act="v-slow" aria-pressed="false" aria-label="Chạy chậm">0,5×</button>${extra || ''}</div></div>`;
+  }
 
   function banner(b) {
     return `<div class="banner tone-${b.tone}" role="status"><b>${esc(b.title)}</b><span>${esc(b.text)}</span></div>`;
@@ -218,50 +227,50 @@
     const tctx = ctxFor(td, t);
     const tp = progressOf(td, t);
     const daysToT = diff(c.tournament, t);
-    const a = P.athlete;
 
     const dayCards = P.days.map(d => {
       const date = addDays(mon, (d.dow + 6) % 7);
       const ctx = ctxFor(d, date);
       const p = progressOf(d, date);
-      const thumbs = mainItems(d).slice(0, 4).map(i => media(i.ex, 'thumb')).join('');
+      const cover = mainItems(d)[0];
       const status = p.completed ? `<span class="st st-done">${ICON.check}Đã xong</span>`
         : p.done ? `<span class="st st-part">${p.done}/${p.total} bài</span>` : '';
       const tag = d.kind === 'gym' ? (d.court ? 'Gym + Sân' : 'Gym') : d.kind === 'court' ? 'Sân' : 'Phục hồi';
       return `<a class="daycard kind-${d.kind} ${date === t ? 'is-today' : ''}" href="#${d.id}">
-        <div class="dc-top"><span class="dc-short">${d.short}</span><span class="dc-tag">${tag}</span>${date === t ? '<span class="dc-today">Hôm nay</span>' : ''}</div>
-        <h3>${esc(d.title)}</h3>
-        <p class="dc-sub">${esc(d.sub)}</p>
-        <div class="dc-thumbs">${thumbs}</div>
-        <div class="dc-meta"><span>~${estimate(d, ctx)} phút</span><span>${mainItems(d).length} mục</span>${status}</div>
+        <div class="dc-cover">${cover ? media(cover.ex) : ''}<span class="dc-short">${d.short}</span>${date === t ? '<span class="dc-today">Hôm nay</span>' : ''}</div>
+        <div class="dc-body">
+          <span class="dc-tag">${tag}</span>
+          <h3>${esc(d.title)}</h3>
+          <div class="dc-meta"><span>~${estimate(d, ctx)} phút</span><span>${mainItems(d).length} mục</span>${status}</div>
+        </div>
       </a>`;
     }).join('');
 
+    const t1 = mainItems(td)[0];
     app.innerHTML = `
       <section class="hero">
-        <div class="hero-inner">
-          <p class="eyebrow">Giáo án cá nhân · gym + bóng rổ</p>
+        <div class="hero-photo"><img src="img/3d/incline-db-press-1.jpg" alt="" aria-hidden="true"></div>
+        <div class="hero-text">
+          <p class="eyebrow">Giáo án cá nhân · Gym + bóng rổ · ${fmtDay(t)}</p>
           <h1 class="hero-title">Giáo án <em>Hậu vệ</em></h1>
-          <p class="hero-goal">Mục tiêu: thi đấu tốt cuối tháng 11 — mạnh hơn, bền hơn, nhanh hơn, bật cao hơn, đổi hướng tốt hơn. ${esc(a.look)}.</p>
-          <ul class="chips athlete" aria-label="Thông tin người tập">
-            ${[a.height, a.weight, a.role, a.level, a.schedule].filter(Boolean).map(x => `<li>${esc(x)}</li>`).join('')}
-          </ul>
-          <div class="hero-stats">
-            <div class="hs hs-phase"><span class="hs-k">Giai đoạn</span><b>${esc(phase.name)}</b><span class="hs-s">${ph.week ? 'Tuần ' + ph.week + ' · ' : ''}${esc(phase.rule)}</span></div>
-            <div class="hs hs-count"><span class="hs-k">Tới giải</span><b class="num">${daysToT >= 0 ? daysToT : 0}<small> ngày</small></b><span class="hs-s">${fmtDay(c.tournament)} · <a href="#tien-do">đổi ngày</a></span></div>
-            <div class="hs hs-week"><span class="hs-k">Tuần này</span><b class="num">${stats.gym}<small>/5 gym</small> · ${stats.court}<small>/2 sân</small></b>${weekDots(mon, stats)}</div>
-          </div>
+          <p class="hero-goal">Mạnh hơn, bền hơn, nhanh hơn, bật cao hơn — sẵn sàng cho giải cuối tháng 11.</p>
         </div>
       </section>
 
+      <section class="stats" aria-label="Tổng quan">
+        <div class="stat stat-phase"><span class="stat-k">Giai đoạn${ph.week ? ' · tuần ' + ph.week : ''}</span><b>${esc(phase.name)}</b></div>
+        <div class="stat stat-count"><span class="stat-k">Tới giải</span><b class="num">${daysToT >= 0 ? daysToT : 0}<small> ngày</small></b><span class="stat-s">${fmtDay(c.tournament)} · <a href="#tien-do">đổi ngày</a></span></div>
+        <div class="stat stat-week"><span class="stat-k">Tuần này</span><b class="num">${stats.gym}<small>/5 gym</small> · ${stats.court}<small>/2 sân</small></b>${weekDots(mon, stats)}</div>
+      </section>
+
       <section class="today-cta kind-${td.kind}">
-        <div class="tc-media">${media(mainItems(td)[0].ex)}</div>
+        <div class="tc-media">${media(t1.ex)}<span class="tc-badge">Hôm nay</span></div>
         <div class="tc-body">
-          <p class="eyebrow">Hôm nay · ${fmtDay(t)}</p>
-          <h2>${esc(td.name)} — ${esc(td.title)}</h2>
-          <p>${esc(td.sub)} · ~${estimate(td, tctx)} phút${tp.done ? ' · đã xong ' + tp.done + '/' + tp.total : ''}</p>
+          <p class="eyebrow">${esc(td.name)} · ${fmtDay(t)}</p>
+          <h2>${esc(td.title)}</h2>
+          <div class="tc-meta"><span>~${estimate(td, tctx)} phút</span><span>${mainItems(td).length} mục</span>${tp.done ? `<span>Đã xong ${tp.done}/${tp.total}</span>` : ''}</div>
           ${tctx.banners.slice(0, 1).map(banner).join('')}
-          <a class="btn btn-primary" href="#${td.id}">${tp.completed ? 'Xem lại buổi hôm nay' : tp.done ? 'Tiếp tục buổi tập' : 'Mở buổi hôm nay'}</a>
+          <a class="btn btn-primary" href="#${td.id}">${ICON.play}${tp.completed ? 'Xem lại buổi hôm nay' : tp.done ? 'Tiếp tục buổi tập' : 'Bắt đầu buổi tập'}</a>
         </div>
       </section>
 
@@ -269,14 +278,7 @@
         <div class="section-head"><h2>Lịch 7 ngày</h2><p>Bấm một ngày để xem giáo án và video từng bài.</p></div>
         <div class="daygrid">${dayCards}</div>
       </section>
-
-      <section class="section">
-        <div class="section-head"><h2>Trước khi tập</h2></div>
-        <div class="basics">
-          ${[['rir', 'Chọn tạ', 'Còn dư 2–3 lần là đúng mức'], ['warmup', 'Khởi động', '8–10 phút trước mỗi buổi'], ['recovery', 'Phục hồi', 'Ngủ 7,5–9 giờ, Chủ nhật đi bộ'], ['nutrition', 'Dinh dưỡng', 'Đủ đạm, đủ tinh bột ngày chơi bóng'], ['safety', 'An toàn', 'Đau cơ khác đau khớp thế nào'], ['taper', 'Trước giải', 'Giảm tải 9 ngày cuối']]
-          .map(([id, t1, t2]) => `<a class="basic" href="#huong-dan--${id}"><b>${t1}</b><span>${t2}</span></a>`).join('')}
-        </div>
-      </section>`;
+`;
   }
 
   /* ───────── trang: một ngày ───────── */
@@ -339,10 +341,10 @@
     const attrs = `data-day="${day.id}" data-ex="${item.ex}"`;
     return `<article class="ex kind-${item.kind} ${r.skip ? 'is-skip' : ''} ${done ? 'is-done' : ''}" id="ex-${item.ex}">
       <div class="ex-media" ${attrs}>
-        <button type="button" class="ex-media-btn" data-act="${vid ? 'play3d' : 'open'}" ${attrs} aria-label="${vid ? 'Xem người mẫu 3D tập' : 'Xem hướng dẫn'}: ${esc(e.vi)}">
+        <button type="button" class="ex-media-btn" data-act="${vid ? 'playv' : 'open'}" ${attrs} aria-label="${vid ? 'Xem video bài tập' : 'Xem hướng dẫn'}: ${esc(e.vi)}">
           ${media(item.ex)}
           <span class="ex-num">${idx}</span>
-          ${vid ? `<span class="ex-play">${ICON.play}<span>Xem 3D</span></span>` : `<span class="ex-play is-info"><span>Hướng dẫn</span></span>`}
+          ${vid ? `<span class="ex-play">${ICON.play}<span>Xem video</span></span>` : `<span class="ex-play is-info"><span>Hướng dẫn</span></span>`}
           ${done ? `<span class="ex-donebadge">${ICON.check}Xong</span>` : ''}
         </button>
       </div>
@@ -366,10 +368,10 @@
   function stripCard(day, item, label) {
     const e = EX[item.ex];
     const vid = hasVideo(item.ex);
-    return `<div class="strip-wrap" data-day="${day.id}" data-ex="${item.ex}"><button type="button" class="strip" data-act="${vid ? 'play3d' : 'open'}" data-day="${day.id}" data-ex="${item.ex}">
+    return `<div class="strip-wrap" data-day="${day.id}" data-ex="${item.ex}"><button type="button" class="strip" data-act="${vid ? 'playv' : 'open'}" data-day="${day.id}" data-ex="${item.ex}">
       ${media(item.ex, 'mini')}
       <span class="strip-t"><span class="eyebrow">${label}</span><b>${esc(e.vi)}</b><span>${esc(item.dose)} · ${esc(e.cue)}</span></span>
-      <span class="strip-go">${vid ? ICON.play + 'Xem 3D' : 'Chi tiết'}</span>
+      <span class="strip-go">${vid ? ICON.play + 'Video' : 'Chi tiết'}</span>
     </button></div>`;
   }
 
@@ -423,7 +425,6 @@
         </div>
       </header>
       ${ctx.banners.map(banner).join('')}
-      ${ctx.phase.id === 'lam-quen' && day.kind !== 'rest' ? banner({ tone: 'info', title: 'Giai đoạn làm quen', text: P.phases['lam-quen'].rule }) : ''}
       ${checkin}
       ${day.warmup ? stripCard(day, { ex: day.warmup, dose: '8–10 phút' }, 'Khởi động trước') : ''}
       ${blocks}
@@ -442,27 +443,23 @@
       </section>`;
   }
 
-  /* ───────── 3D chạy ngay trong thẻ (một thẻ tại một thời điểm) ───────── */
-  let inline = null; // { box, html, h, ex }
+  /* ───────── video chạy ngay trong thẻ (một thẻ tại một thời điểm) ───────── */
+  let inline = null; // { box, html, ex }
   function stopInline() {
     if (!inline) return;
     const it = inline; inline = null;
-    it.h.destroy();
+    const v = it.box.querySelector('video'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
     if (it.box.isConnected) { it.box.innerHTML = it.html; it.box.classList.remove('is-live'); }
   }
   function playInline(el) {
     const box = el.closest('.ex-media, .strip-wrap');
-    if (!box || !window.Anim3D || !Anim3D.has(el.dataset.ex)) return false;
+    if (!box || !hasVideo(el.dataset.ex)) return false;
     stopInline();
     const day = el.dataset.day, ex = el.dataset.ex, html = box.innerHTML;
     box.classList.add('is-live');
-    box.innerHTML = '<div class="ex-live"></div>';
-    const extra = `<button type="button" class="a3-btn a3-more" data-act="open" data-day="${esc(day)}" data-ex="${esc(ex)}">Chi tiết</button>` +
-      `<button type="button" class="a3-btn a3-x" data-act="stop3d" aria-label="Tắt 3D, hiện lại ảnh">${ICON.close}</button>`;
-    const wide = box.clientWidth >= 560; // khung rộng (máy tính) → thấp hơn cho đỡ chiếm màn hình
-    const h = Anim3D.mount(box.firstChild, ex, { aspect: wide ? 0.56 : 0.8, zoom: wide ? 0.9 : 0.8, compact: true, extra });
-    if (!h) { box.innerHTML = html; box.classList.remove('is-live'); return false; }
-    inline = { box, html, h, ex };
+    box.innerHTML = videoHTML(ex, `<button type="button" class="vbtn vbtn-more" data-act="open" data-day="${esc(day)}" data-ex="${esc(ex)}">Chi tiết</button>` +
+      `<button type="button" class="vbtn" data-act="stopv" aria-label="Tắt video, hiện lại ảnh">${ICON.close}</button>`);
+    inline = { box, html, ex };
     return true;
   }
 
@@ -477,9 +474,8 @@
     renderModal();
   }
 
-  let anim3d = null; // hoạt hình 3D đang chạy trong cửa sổ
   function stopMedia() {
-    if (anim3d) { anim3d.destroy(); anim3d = null; }
+    modalRoot.querySelectorAll('video').forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); });
   }
 
   function renderModal() {
@@ -494,7 +490,7 @@
     const ctx = ctxFor(day, date);
     const r = rx(item, ctx);
     const prev = order[pos - 1], next = order[pos + 1];
-    const can3d = hasVideo(showId) && !modalState.no3d;
+    const can3d = hasVideo(showId);
     const role = item.role === 'warmup' ? 'Khởi động' : item.role === 'cooldown' ? 'Thả lỏng' : 'Bài ' + order.filter(i => !i.role).indexOf(item) + 1;
     const label = item.role ? role : 'Bài ' + (order.filter(i => !i.role).indexOf(item) + 1) + '/' + order.filter(i => !i.role).length;
 
@@ -516,30 +512,28 @@
         </div>
         <div class="sheet-scroll" id="sheet-scroll">
           ${alt ? `<div class="banner tone-info"><b>Bài thay thế cho “${esc(EX[ex].vi)}”</b><span>Làm cùng số hiệp, số lần như bài gốc. <button type="button" class="link" data-act="alt" data-day="${day.id}" data-ex="${ex}" data-alt="">← Quay lại bài gốc</button></span></div>` : ''}
-          ${can3d ? `<div class="vp vp-3d" id="vp"></div>
-            <p class="vsrc muted">Người mẫu 3D tập đúng theo các bước bên dưới · <b class="k-hot">đỏ</b> là cơ chính, <b class="k-warm">cam nhạt</b> là cơ phụ · <b class="k-ok">đường xanh</b> là quỹ đạo đúng · kéo để xoay, bấm Nghiêng / Bên / Trước để đổi góc.</p>`
-          : `<div class="novideo">${media(showId)}<p>${hasVideo(showId) ? 'Máy này không chạy được hoạt hình 3D — xem 2 tư thế trong ảnh và làm theo các bước bên dưới.' : 'Hoạt động này không cần video — làm theo các bước bên dưới.'}</p></div>`}
+          ${can3d ? `<div class="vp">${videoHTML(showId)}</div>`
+          : `<div class="novideo">${media(showId)}<p>Hoạt động này không cần video — làm theo các bước bên dưới.</p></div>`}
 
           <div class="rxbox">
             <h3>Hôm nay</h3>
             ${r.skip ? `<p class="skipnote">${esc(r.reason)}</p>` : rxChips(item, r)}
             ${e.load ? `<p class="load"><b>Mức tạ khởi điểm:</b> ${esc(e.load)}</p>` : ''}
+            ${e.equip ? `<p class="load"><b>Dụng cụ:</b> ${esc(e.equip)}</p>` : ''}
           </div>
 
           ${item.sets && !alt && !r.skip ? `<section class="msec"><h3>Ghi hiệp</h3>${loggerHTML(day, date, item, r, 'modal')}
             <div class="ex-actions">${item.rest ? `<button type="button" class="btn btn-ghost" data-act="rest" data-sec="${item.rest}">${ICON.clock}Nghỉ ${fmtRest(item.rest)}</button>` : ''}</div></section>` : ''}
 
           ${!e.art ? `<section class="msec"><h3>Nhóm cơ được tập</h3>
-            <figure class="musmap"><img src="img/3d/${showId}-map.jpg" alt="Người mẫu 3D nhìn trước và sau, tô nhóm cơ: ${esc(e.muscles)}" loading="lazy">
-            <figcaption><span class="lg lg-hot"></span>Cơ chính <span class="lg lg-warm"></span>Cơ phụ · ${esc(e.muscles)}</figcaption></figure>
-            <div class="poses"><figure><img src="img/3d/${showId}-0.jpg" alt="${esc(e.vi)} — tư thế bắt đầu" loading="lazy"><figcaption>Tư thế bắt đầu</figcaption></figure><figure><img src="img/3d/${showId}-1.jpg" alt="${esc(e.vi)} — lúc gắng sức" loading="lazy"><figcaption>Lúc gắng sức</figcaption></figure></div></section>` : ''}
+            <figure class="musmap"><img src="img/3d/${showId}-map.jpg" alt="Người mẫu nhìn trước và sau, tô nhóm cơ: ${esc(e.muscles)}" loading="lazy">
+            <figcaption><span class="lg lg-hot"></span>${esc(e.muscles)}</figcaption></figure></section>` : ''}
 
           <section class="msec"><h3>Các bước thực hiện</h3><ol class="steps">${(e.steps || []).map(s => `<li>${esc(s)}</li>`).join('')}</ol></section>
           ${e.breath && e.breath !== '—' ? `<section class="msec"><h3>Cách thở</h3><p>${esc(e.breath)}</p></section>` : ''}
           <section class="msec"><h3>Lỗi người mới hay mắc</h3>${list(e.mistakes, 'dots')}</section>
           ${e.stop && e.stop.length ? `<section class="msec msec-warn"><h3>Giảm tạ hoặc dừng khi</h3>${list(e.stop, 'dots')}</section>` : ''}
           ${alts ? `<section class="msec"><h3>Bài thay thế (máy bận / chưa đủ kỹ thuật)</h3><div class="alts">${alts}</div></section>` : ''}
-          <dl class="facts"><div><dt>Nhóm cơ chính</dt><dd>${esc(e.muscles)}</dd></div><div><dt>Dụng cụ</dt><dd>${esc(e.equip)}</dd></div></dl>
         </div>
         <div class="sheet-foot">
           ${prev ? `<button type="button" class="btn btn-ghost fbtn" data-act="nav" data-day="${day.id}" data-ex="${prev.ex}" aria-label="Bài trước: ${esc(EX[prev.ex].vi)}"><span class="fb-k">← Trước</span><span class="fb-n">${esc(EX[prev.ex].vi)}</span></button>` : '<span></span>'}
@@ -548,11 +542,6 @@
         </div>
       </div>`;
     document.documentElement.classList.add('modal-open');
-    const vp = document.getElementById('vp');
-    if (vp) {
-      anim3d = Anim3D.mount(vp, showId, window.innerWidth < 560 ? { aspect: 1, zoom: 0.92 } : {});
-      if (!anim3d) { modalState.no3d = true; return renderModal(); } // máy không có WebGL → ảnh tĩnh
-    }
     const closeBtn = modalRoot.querySelector('.sheet-bar .iconbtn');
     if (closeBtn) closeBtn.focus({ preventScroll: true });
   }
@@ -678,12 +667,12 @@
     const howto = {
       id: 'cach-dung', title: 'Cách dùng ở phòng tập',
       body: [
-        'Mở web → chọn ngày (hoặc “Hôm nay”) → bấm vào ảnh bài tập: người mẫu 3D tập ngay trong khung ảnh. Bấm “Chi tiết” để xem các bước, cách thở, lỗi hay gặp; trong đó bấm “Bài tiếp” để sang bài sau.',
+        'Mở web → chọn ngày (hoặc “Hôm nay”) → bấm vào ảnh bài tập: video chạy ngay trong khung ảnh. Bấm “Chi tiết” để xem các bước, cách thở, lỗi hay gặp; trong đó bấm “Bài tiếp” để sang bài sau.',
         'Đầu buổi chọn “Hôm nay bạn thấy thế nào?” — số hiệp tự điều chỉnh theo cảm giác.',
         'Mỗi hiệp: nhập kg và số lần, bấm ✓. Đồng hồ nghỉ tự chạy (tắt được trong Tiến độ → Cài đặt). Bỏ trống mà bấm ✓ thì web điền lại số của lần trước.',
         'Cuối buổi: chấm mức mệt 1–10, đánh dấu nếu có đau, bấm “Hoàn thành buổi tập”.',
-        'Người mẫu 3D chạy ngay trong trang: không mở tab, không link ngoài, không quảng cáo. Phần phát sáng đỏ là cơ chính bài đó tập, cam nhạt là cơ phụ; đường xanh là quỹ đạo đúng của tay / chân. Kéo để xoay, bấm Nghiêng / Bên / Trước để đổi góc, 1× để chậm lại.',
-        'Người mẫu 3D dựng từ khung người MakeHuman (CC0 — dùng tự do).'
+        'Video chạy ngay trong trang: không mở tab, không link ngoài, không quảng cáo. Phần thớ cơ đỏ là cơ chính bài đó tập. Bấm 0,5× để xem chậm, ❚❚ để dừng hình.',
+        'Video dựng 3D bằng Blender từ người mẫu MakeHuman (CC0 — dùng tự do).'
       ]
     };
     const sections = [howto].concat(P.guide);
@@ -757,7 +746,7 @@
 
   let current = null;
   function render() {
-    const keep = inline && inline.ex; // đang chạy 3D trong thẻ → vẽ lại xong thì chạy tiếp
+    const keep = inline && inline.ex; // đang chạy video trong thẻ → vẽ lại xong thì chạy tiếp
     stopInline();
     const r = route();
     current = r;
@@ -771,7 +760,7 @@
     else if (r.view === 'guide') viewGuide();
     else viewWeek();
     if (keep) {
-      const b = document.querySelector(`.ex-media[data-ex="${keep}"] [data-act="play3d"], .strip-wrap[data-ex="${keep}"] [data-act="play3d"]`);
+      const b = document.querySelector(`.ex-media[data-ex="${keep}"] [data-act="playv"], .strip-wrap[data-ex="${keep}"] [data-act="playv"]`);
       if (b) playInline(b);
     }
   }
@@ -855,8 +844,19 @@
     const act = el.dataset.act;
     switch (act) {
       case 'open': goModal(el.dataset.day, el.dataset.ex); break;
-      case 'play3d': if (!playInline(el)) goModal(el.dataset.day, el.dataset.ex); break;
-      case 'stop3d': stopInline(); break;
+      case 'playv': if (!playInline(el)) goModal(el.dataset.day, el.dataset.ex); break;
+      case 'stopv': stopInline(); break;
+      case 'v-pause': {
+        const v = el.closest('.vbox').querySelector('video');
+        if (v.paused) { v.play().catch(() => {}); el.setAttribute('aria-pressed', 'false'); el.innerHTML = ICON.pause; }
+        else { v.pause(); el.setAttribute('aria-pressed', 'true'); el.innerHTML = ICON.play; }
+        break;
+      }
+      case 'v-slow': {
+        const v = el.closest('.vbox').querySelector('video');
+        const slow = v.playbackRate !== 0.5; v.playbackRate = slow ? 0.5 : 1; el.setAttribute('aria-pressed', String(slow));
+        break;
+      }
       case 'nav': goModal(el.dataset.day, el.dataset.ex); document.getElementById('sheet-scroll') && (document.getElementById('sheet-scroll').scrollTop = 0); break;
       case 'alt': goModal(el.dataset.day, el.dataset.ex, el.dataset.alt || null); break;
       case 'close': requestClose(); break;
