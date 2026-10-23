@@ -1,4 +1,4 @@
-/* Giao diện kiểu ứng dụng tập luyện cao cấp: nền navy sâu, ảnh dựng 3D chất lượng phim là trung tâm (nền sáng, vòng bạc hà),
+/* Giao diện kiểu ứng dụng tập luyện cao cấp: nền navy sâu, ảnh dựng 3D chất lượng phim là trung tâm (phông studio xanh than),
    chữ tiêu đề thể thao nghiêng, một màu nhấn cam (quả bóng) + xanh bạc hà cho tiến độ. Tối ưu bấm một tay ở phòng tập. */
 :root {
   color-scheme: dark;
@@ -19,7 +19,7 @@
   --amber: #fbbf24;
   --red: #f87171;
   --green: #34d399;
-  --photo: #f3f5f4;
+  --photo: #03060d;   /* trùng mép phông studio của video / ảnh 3D: lúc chưa tải xong không loé trắng */
   --on-accent: #1a0a00;
   --on-light: #07121f;
   --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
@@ -131,7 +131,7 @@ p { margin: 0; }
 .chips li { border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; color: var(--ink-2); background: rgba(255, 255, 255, .02); }
 .chips .chip-phase { border-color: color-mix(in srgb, var(--teal) 50%, transparent); color: var(--teal); }
 
-/* ── ảnh động tác (ảnh dựng nền sáng) ── */
+/* ── ảnh động tác (ảnh dựng phông tối) ── */
 .ph { position: relative; display: block; overflow: hidden; aspect-ratio: 16 / 10; background: var(--photo); width: 100%; }
 .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ph .ph-b { opacity: 0; animation: phswap 3.4s ease-in-out infinite; }
@@ -338,7 +338,7 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 .ex.is-skip { opacity: .6; }
 .ex-media { position: relative; display: block; width: 100%; background: var(--photo); }
 .ex-media-btn { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: inherit; font: inherit; }
-.ex-num { position: absolute; left: 12px; top: 12px; min-width: 38px; height: 38px; padding: 0 8px; border-radius: 12px; background: rgba(7, 13, 26, .86); color: #fff; display: grid; place-items: center; font: 800 italic 21px/1 var(--font-display); backdrop-filter: blur(6px); }
+.ex-num { position: absolute; left: 12px; top: 12px; min-width: 38px; height: 38px; padding: 0 8px; border-radius: 12px; background: rgba(7, 13, 26, .86); border: 1px solid rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; font: 800 italic 21px/1 var(--font-display); backdrop-filter: blur(6px); }
 .ex-play {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
@@ -372,10 +372,10 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 .vbox { position: relative; background: var(--photo); }
 .vbox video { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: var(--photo); }
 .vbar { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; }
-.vbtn { min-height: 38px; min-width: 40px; padding: 0 13px; border-radius: 999px; border: 0; background: rgba(7, 13, 26, .82); color: #fff; font: 700 13px/1 var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; backdrop-filter: blur(6px); }
+.vbtn { min-height: 38px; min-width: 40px; padding: 0 13px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(7, 13, 26, .82); color: #fff; font: 700 13px/1 var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; backdrop-filter: blur(6px); }
 .vbtn svg { width: 17px; height: 17px; fill: currentColor; }
 .vbtn[aria-pressed="true"] { background: var(--teal); color: var(--on-light); }
-.vbtn-more { margin-left: auto; background: var(--accent); }
+.vbtn-more { margin-left: auto; background: var(--accent); border-color: transparent; }
 .vcap { position: absolute; left: 10px; top: 10px; max-width: calc(100% - 20px); padding: 6px 10px; border-radius: 10px; background: rgba(7, 13, 26, .78); color: #fff; font-size: 12.5px; font-weight: 600; }
 
 /* ghi hiệp */
