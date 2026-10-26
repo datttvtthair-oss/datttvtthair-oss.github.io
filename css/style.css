@@ -362,6 +362,8 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 .rx { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .rx li { background: var(--raised); border-radius: 10px; padding: 5px 10px; font-size: 13.5px; color: var(--ink-2); }
 .rx b { color: var(--ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+.rx .rx-kg { background: color-mix(in srgb, var(--accent) 18%, var(--raised)); }
+.rx .rx-kg b { color: var(--accent-2); }
 .rx-note { font-size: 12.5px; color: var(--amber); }
 .cue { font-size: 14px; color: var(--ink-2); border-left: 3px solid var(--k); padding-left: 11px; }
 .skipnote { font-size: 14px; color: var(--accent-2); font-weight: 600; }

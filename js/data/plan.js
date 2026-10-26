@@ -5,6 +5,7 @@
  *  work: số giây làm việc ước tính mỗi hiệp (để tính thời lượng); mặc định 45.
  *  unit: 'reps' (mặc định) | 'sec' (tính bằng giây) ; bw: true = không cần ghi tạ.
  *  Bài ở sân / phục hồi dùng dose (chữ) + min (phút ước tính) thay cho sets.
+ *  kg: [mức đầu, mục tiêu trước giải, bước tăng, ghi chú] — web tự tính số kg gợi ý cho từng tuần.
  */
 window.PLAN = {
   athlete: {
@@ -20,106 +21,109 @@ window.PLAN = {
 
   days: [
     {
-      id: 't2', dow: 1, short: 'T2', name: 'Thứ 2', title: 'Chân A', sub: 'Sức mạnh thân dưới',
+      id: 't2', dow: 1, short: 'T2', name: 'Thứ 2', title: 'Chân A', sub: 'Sức mạnh thân dưới & tiếp đất',
       kind: 'gym', legs: true, counts: { gym: 1 }, warmup: 'gym-warmup', cooldown: 'stretching',
-      note: 'Buổi chân nặng nhất tuần. Hôm sau là bóng rổ kỹ thuật (nhẹ) nên không cần ép thêm.',
+      note: 'Bật ngang làm đầu buổi khi chân còn tươi. Nordic để cuối phần chân: đổ thật chậm, tuần đầu chỉ nửa đường. Hôm sau là bóng rổ kỹ thuật (nhẹ).',
       blocks: [{
         kind: 'gym', title: 'Gym — chân A', items: [
-          { ex: 'goblet-squat', sets: 3, reps: '8–10', rest: 120, rir: '2–3', tier: 'main' },
-          { ex: 'db-rdl', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'leg-press', sets: 3, reps: '10–12', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'bulgarian-split-squat', sets: 2, reps: '8 / chân', rest: 75, rir: '2–3', tier: 'main', work: 90 },
-          { ex: 'seated-leg-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc' },
-          { ex: 'standing-calf-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc' },
-          { ex: 'pallof-press', sets: 2, reps: '10 / bên', rest: 45, rir: '—', tier: 'acc', work: 60 }
+          { ex: 'lateral-bound', sets: 3, reps: '4 / bên', rest: 60, rir: 'Đứng vững 1–2 giây', tier: 'main', bw: true, work: 30 },
+          { ex: 'goblet-squat', sets: 3, reps: '8–10', rest: 120, rir: '2–3', tier: 'main', kg: [12, 18, 2, '(1 tạ ôm ngực)'] },
+          { ex: 'db-rdl', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main', kg: [10, 16, 2, 'mỗi tay'] },
+          { ex: 'bulgarian-split-squat', sets: 2, reps: '8 / chân', rest: 75, rir: '2–3', tier: 'main', work: 90, kg: [4, 10, 2, 'mỗi tay'] },
+          { ex: 'leg-press', sets: 2, reps: '10–12', rest: 90, rir: '2–3', tier: 'acc', kg: [40, 70, 10, 'tải thêm (chưa tính bàn trượt)'] },
+          { ex: 'nordic-curl', sets: 2, reps: '4–6', rest: 120, rir: 'Đổ chậm 3–5 giây', tier: 'main', bw: true, work: 40 },
+          { ex: 'standing-calf-raise', sets: 2, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc', kg: [20, 40, 5, 'trên máy'] }
         ]
       }]
     },
     {
       id: 't3', dow: 2, short: 'T3', name: 'Thứ 3', title: 'Thân trên A', sub: 'Gym + bóng rổ kỹ thuật & ném',
       kind: 'gym', court: true, counts: { gym: 1, court: 1 }, warmup: 'gym-warmup', cooldown: 'stretching',
-      note: 'Nếu tập cùng một buổi: bóng rổ trước, gym sau (kỹ thuật cần cơ thể còn tươi). Tốt nhất là cách nhau từ 4 giờ trở lên.',
+      note: 'Nếu tập cùng một buổi: bóng rổ trước, gym sau (kỹ thuật cần cơ thể còn tươi). Tốt nhất là cách nhau từ 4 giờ trở lên. Chạy con thoi để cuối buổi sân.',
       blocks: [
         {
           kind: 'gym', title: 'Gym — thân trên A', items: [
-            { ex: 'db-bench-press', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main' },
-            { ex: 'lat-pulldown', sets: 3, reps: '8–12', rest: 90, rir: '2–3', tier: 'main' },
-            { ex: 'seated-cable-row', sets: 3, reps: '10–12', rest: 75, rir: '2–3', tier: 'main' },
-            { ex: 'incline-db-press', sets: 2, reps: '10–12', rest: 75, rir: '2–3', tier: 'main' },
-            { ex: 'lateral-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc' },
-            { ex: 'face-pull', sets: 2, reps: '12–15', rest: 45, rir: '2', tier: 'acc' }
+            { ex: 'db-bench-press', sets: 3, reps: '6–10', rest: 120, rir: '2–3', tier: 'main', kg: [10, 16, 2, 'mỗi tay'] },
+            { ex: 'lat-pulldown', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main', kg: [30, 45, 5, 'cọc tạ'] },
+            { ex: 'seated-cable-row', sets: 3, reps: '10–12', rest: 75, rir: '2–3', tier: 'main', kg: [30, 45, 5, 'cọc tạ'] },
+            { ex: 'incline-db-press', sets: 2, reps: '10–12', rest: 75, rir: '2–3', tier: 'main', kg: [8, 12, 2, 'mỗi tay'] },
+            { ex: 'lateral-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc', kg: [4, 6, 1, 'mỗi tay'] },
+            { ex: 'face-pull', sets: 2, reps: '12–15', rest: 45, rir: '2', tier: 'acc', kg: [10, 15, 2.5, 'cọc tạ'] }
           ]
         },
         {
           kind: 'court', title: 'Bóng rổ — kỹ thuật & ném rổ', items: [
             { ex: 'bb-warmup', dose: '10 phút', min: 10, tier: 'main' },
             { ex: 'ball-handling', dose: '10 phút', min: 10, tier: 'main' },
-            { ex: 'shooting-form', dose: '20–25 phút', min: 25, tier: 'main' }
+            { ex: 'shooting-form', dose: '20 phút', min: 20, tier: 'main' },
+            { ex: 'shuttle-run', dose: '4–6 lượt × 20 giây, nghỉ 40 giây', min: 6, tier: 'acc' }
           ]
         }
       ]
     },
     {
-      id: 't4', dow: 3, short: 'T4', name: 'Thứ 4', title: 'Thân trên B', sub: 'Phát triển cơ — vai & lưng',
+      id: 't4', dow: 3, short: 'T4', name: 'Thứ 4', title: 'Thân trên B', sub: 'Vai & lưng — tạo dáng',
       kind: 'gym', counts: { gym: 1 }, warmup: 'gym-warmup', cooldown: 'stretching',
       note: 'Buổi tạo dáng vai – lưng. Tạ vừa phải, tập chậm và đúng cơ.',
       blocks: [{
         kind: 'gym', title: 'Gym — thân trên B', items: [
-          { ex: 'machine-chest-press', sets: 3, reps: '10–12', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'chest-supported-row', sets: 3, reps: '10–12', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'db-shoulder-press', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'reverse-pec-deck', sets: 2, reps: '12–15', rest: 60, rir: '2', tier: 'acc' },
-          { ex: 'lateral-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc' },
-          { ex: 'biceps-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc' },
-          { ex: 'triceps-pushdown', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc' }
+          { ex: 'machine-chest-press', sets: 2, reps: '10–12', rest: 90, rir: '2–3', tier: 'main', kg: [25, 40, 5, 'cọc tạ'] },
+          { ex: 'chest-supported-row', sets: 3, reps: '10–12', rest: 90, rir: '2–3', tier: 'main', kg: [10, 16, 2, 'mỗi tay'] },
+          { ex: 'db-shoulder-press', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main', kg: [8, 12, 2, 'mỗi tay'] },
+          { ex: 'reverse-pec-deck', sets: 2, reps: '12–15', rest: 60, rir: '2', tier: 'acc', kg: [15, 25, 5, 'cọc tạ'] },
+          { ex: 'lateral-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc', kg: [4, 6, 1, 'mỗi tay'] },
+          { ex: 'biceps-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc', kg: [6, 10, 2, 'mỗi tay'] },
+          { ex: 'triceps-pushdown', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc', kg: [15, 25, 5, 'cọc tạ'] }
         ]
       }]
     },
     {
-      id: 't5', dow: 4, short: 'T5', name: 'Thứ 5', title: 'Bóng rổ', sub: 'Tốc độ & kỹ thuật',
+      id: 't5', dow: 4, short: 'T5', name: 'Thứ 5', title: 'Bóng rổ', sub: 'Tốc độ, đổi hướng & thể lực thi đấu',
       kind: 'court', counts: { court: 1 }, cooldown: 'stretching',
-      note: 'Mai là Chân B có bật nhảy: nếu hôm nay đấu nhiều hoặc chân nặng, bỏ phần tăng tốc.',
+      note: 'Buổi sân nặng nhất tuần. Chân B dời sang Thứ 7 (cách 48 giờ) nên hôm nay chạy tăng tốc và con thoi hết sức.',
       blocks: [{
         kind: 'court', title: 'Buổi sân', items: [
           { ex: 'bb-warmup', dose: '10–12 phút', min: 12, tier: 'main' },
           { ex: 'ball-handling', dose: '10 phút', min: 10, tier: 'main' },
+          { ex: 'acceleration', dose: '6–8 lần × 10–15 m, nghỉ 60–90 giây', min: 10, tier: 'main' },
           { ex: 'change-direction', dose: '4–6 lượt mỗi chiều', min: 10, tier: 'main' },
-          { ex: 'acceleration', dose: '6–8 lần × 10–15 m', min: 10, tier: 'acc', cond: 'Chỉ khi cơ thể đã sẵn sàng' },
           { ex: 'defensive-slide', dose: '4–6 lượt × 15–20 giây', min: 8, tier: 'main' },
-          { ex: 'shooting-form', dose: '10 phút', min: 10, tier: 'main' },
           { ex: 'pullup-jumper', dose: '3–4 vị trí × 8 quả', min: 12, tier: 'main' },
-          { ex: 'scrimmage', dose: '15–30 phút', min: 20, tier: 'acc', cond: 'Nếu có lịch và còn đủ sức' }
+          { ex: 'scrimmage', dose: '15–30 phút', min: 20, tier: 'acc', cond: 'Nếu có lịch và còn đủ sức' },
+          { ex: 'shuttle-run', dose: '6–8 lượt × 20 giây, nghỉ 40 giây', min: 10, tier: 'main' }
         ]
       }]
     },
     {
-      id: 't6', dow: 5, short: 'T6', name: 'Thứ 6', title: 'Chân B', sub: 'Sức mạnh & sức bật',
-      kind: 'gym', legs: true, counts: { gym: 1 }, warmup: 'gym-warmup', cooldown: 'stretching',
-      note: 'Bật nhảy làm đầu buổi khi chân còn tươi. Mỗi lần nhảy phải chất lượng — độ cao giảm rõ thì dừng.',
-      blocks: [{
-        kind: 'gym', title: 'Gym — chân B', items: [
-          { ex: 'cmj', sets: 3, reps: '3', rest: 75, rir: 'Nhảy hết sức', tier: 'main', bw: true, work: 30 },
-          { ex: 'trap-bar-deadlift', sets: 3, reps: '5–6', rest: 120, rir: '2–3', tier: 'main' },
-          { ex: 'step-up', sets: 2, reps: '8 / chân', rest: 75, rir: '2–3', tier: 'main', work: 90 },
-          { ex: 'hip-thrust', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'lying-leg-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc' },
-          { ex: 'seated-calf-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc' }
-        ]
-      }]
-    },
-    {
-      id: 't7', dow: 6, short: 'T7', name: 'Thứ 7', title: 'Thân trên C + Core', sub: 'Vai, lưng & giữ thân',
+      id: 't6', dow: 5, short: 'T6', name: 'Thứ 6', title: 'Thân trên C + Core', sub: 'Vai, lưng, giữ thân & phòng chấn thương',
       kind: 'gym', counts: { gym: 1 }, warmup: 'gym-warmup', cooldown: 'stretching',
-      note: 'Core giúp giữ thân vững khi va chạm và đổi hướng. Làm chậm, đúng tư thế.',
+      note: 'Buổi nhẹ cho chân nghỉ sau buổi sân. Core và Copenhagen giúp giữ thân vững, phòng căng cơ háng khi đổi hướng.',
       blocks: [{
         kind: 'gym', title: 'Gym — thân trên C + core', items: [
-          { ex: 'incline-machine-press', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'neutral-pulldown', sets: 3, reps: '8–12', rest: 90, rir: '2–3', tier: 'main' },
-          { ex: 'cable-lateral-raise', sets: 3, reps: '12–15 / tay', rest: 45, rir: '1–2', tier: 'acc', work: 70 },
-          { ex: 'cable-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc' },
-          { ex: 'triceps-pushdown', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc' },
+          { ex: 'incline-machine-press', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main', kg: [20, 35, 5, 'cọc tạ'] },
+          { ex: 'neutral-pulldown', sets: 3, reps: '8–12', rest: 90, rir: '2–3', tier: 'main', kg: [30, 45, 5, 'cọc tạ'] },
+          { ex: 'cable-lateral-raise', sets: 2, reps: '12–15 / tay', rest: 45, rir: '1–2', tier: 'acc', work: 70, kg: [2.5, 5, 2.5, 'mỗi tay'] },
+          { ex: 'cable-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc', kg: [10, 17.5, 2.5, 'cọc tạ'] },
+          { ex: 'pallof-press', sets: 2, reps: '10 / bên', rest: 45, rir: '—', tier: 'main', work: 60, kg: [7.5, 12.5, 2.5, 'cọc tạ'] },
           { ex: 'dead-bug', sets: 3, reps: '6–8 / bên', rest: 45, rir: '—', tier: 'main', bw: true },
-          { ex: 'side-plank', sets: 3, reps: '20–30 giây / bên', rest: 45, rir: '—', tier: 'main', bw: true, unit: 'sec', work: 60 }
+          { ex: 'side-plank', sets: 2, reps: '20–30 giây / bên', rest: 45, rir: '—', tier: 'main', bw: true, unit: 'sec', work: 60 },
+          { ex: 'copenhagen-plank', sets: 2, reps: '15–20 giây / bên', rest: 45, rir: '—', tier: 'main', bw: true, unit: 'sec', work: 50 }
+        ]
+      }]
+    },
+    {
+      id: 't7', dow: 6, short: 'T7', name: 'Thứ 7', title: 'Chân B', sub: 'Tốc độ, sức bật & sức mạnh',
+      kind: 'gym', legs: true, counts: { gym: 1 }, warmup: 'gym-warmup', cooldown: 'stretching',
+      note: 'Chạy tăng tốc và bật nhảy làm đầu buổi khi chân còn tươi, nghỉ đủ giữa các lần — độ cao / tốc độ giảm rõ thì dừng. Mai Chủ nhật nghỉ.',
+      blocks: [{
+        kind: 'gym', title: 'Gym — chân B', items: [
+          { ex: 'acceleration', sets: 5, reps: '10 m', rest: 75, rir: 'Chạy hết tốc', tier: 'main', bw: true, work: 5 },
+          { ex: 'cmj', sets: 3, reps: '3', rest: 75, rir: 'Nhảy hết sức', tier: 'main', bw: true, work: 30 },
+          { ex: 'trap-bar-deadlift', sets: 3, reps: '4–6', rest: 150, rir: '2–3', tier: 'main', kg: [40, 70, 5, 'tổng cả thanh'] },
+          { ex: 'step-up', sets: 2, reps: '8 / chân', rest: 75, rir: '2–3', tier: 'main', work: 90, kg: [4, 10, 2, 'mỗi tay'] },
+          { ex: 'hip-thrust', sets: 3, reps: '8–10', rest: 90, rir: '2–3', tier: 'main', kg: [30, 60, 5, 'tổng cả thanh'] },
+          { ex: 'lying-leg-curl', sets: 2, reps: '10–12', rest: 60, rir: '2', tier: 'acc', kg: [15, 25, 5, 'cọc tạ'] },
+          { ex: 'seated-calf-raise', sets: 3, reps: '12–15', rest: 45, rir: '1–2', tier: 'acc', kg: [15, 30, 5, 'trên máy'] }
         ]
       }]
     },
@@ -177,7 +181,7 @@ window.PLAN = {
       body: [
         'RIR = số lần còn dư. RIR 2 nghĩa là bạn còn làm được khoảng 2 lần nữa đúng kỹ thuật nhưng chủ động dừng.',
         'Hiệp đầu của mỗi bài là hiệp thử. Còn dư hơn 4 lần → tăng tạ. Còn dư dưới 2 lần, hoặc kỹ thuật bắt đầu xấu → giảm tạ.',
-        'Mức tạ trong từng bài chỉ là điểm bắt đầu để thử, không phải con số dành riêng cho bạn. Máy mỗi phòng tập khác nhau.',
+        'Mỗi bài có số kg gợi ý cho tuần hiện tại: 2 tuần đầu ở mức nhẹ, sau đó tăng dần đều tới mục tiêu trước giải. Đó là điểm bắt đầu để thử — máy mỗi phòng tập khác nhau, nên vẫn chỉnh theo cảm giác còn dư 2–3 lần.',
         'Không tập đến kiệt sức ở mọi hiệp. Với người mới vừa tập tạ vừa chơi bóng, dừng sớm 2–3 lần giúp hồi phục kịp cho buổi sau.',
         'Ghi lại mức tạ và số lần ở mỗi hiệp. Lần sau nhìn dòng "Lần trước" để biết nên giữ hay tăng.'
       ]

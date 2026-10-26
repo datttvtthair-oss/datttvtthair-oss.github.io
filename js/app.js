@@ -86,16 +86,32 @@
     return ctx;
   }
 
+  /* Số kg gợi ý hôm nay. item.kg = [mức đầu, mục tiêu trước giải, bước tăng, ghi chú].
+     Làm quen: mức đầu · Tăng tiến: tăng đều tới mục tiêu lúc bắt đầu giảm tải · Giảm tải / sau giải: giữ mức đã đạt.
+     Rất mệt hoặc sát trận: nhẹ đi khoảng 15%. */
+  function kgFor(item, ctx) {
+    const [s, e, step, note] = item.kg;
+    const c = cfg(), t0 = addDays(c.start, 14), t1 = addDays(c.tournament, -9);
+    const ph = ctx.phase.id;
+    const f = ph === 'lam-quen' ? 0 : ph === 'tang-tien' ? Math.min(1, Math.max(0, diff(ctx.date, t0) / Math.max(1, diff(t1, t0)))) : 1;
+    const snap = v => Math.max(step, Math.floor(v / step + 1e-6) * step);
+    let w = snap(s + (e - s) * f);
+    if (ctx.light || ctx.checkin === 'rat-met') w = Math.max(snap(s * 0.8), snap(w * 0.85));
+    return { w, goal: e, note };
+  }
+  const fmtKg = v => String(Math.round(v * 100) / 100).replace('.', ',');
+  const isRir = v => /^\d+([–-]\d+)?$/.test(String(v || '').trim());   // "2–3" là số lần còn dư; "Đứng vững 1–2 giây" là ghi chú
+
   /* Thông số hôm nay của một bài sau khi áp giai đoạn, check-in, lịch thi đấu. */
   function rx(item, ctx) {
-    const out = { skip: false, reason: '', sets: item.sets || 0, rir: item.rir || '', changed: false };
+    const out = { skip: false, reason: '', sets: item.sets || 0, rir: item.rir || '', changed: false, kg: item.kg ? kgFor(item, ctx) : null };
     if (item.role) return out;
     if (ctx.gameDay && item.kind === 'gym') return Object.assign(out, { skip: true, reason: 'Ngày thi đấu — không tập gym' });
     const tired = ctx.checkin === 'rat-met';
     if (item.sets) {
       const ph = P.phases[ctx.phase.id];
       let s = item.sets, rir = item.rir;
-      const numeric = /\d/.test(rir || '');
+      const numeric = isRir(rir);
       if (ph.setDelta) s = Math.max(ph.minSets || 1, s + ph.setDelta);
       if (ph.setFactor) s = Math.max(1, Math.ceil(s * ph.setFactor));
       if (ph.rir && numeric) rir = ph.rir;
@@ -307,7 +323,7 @@
       const attrs = `data-k="${k}" data-day="${day.id}" data-date="${date}" data-ex="${item.ex}" data-i="${i}"`;
       rows += `<div class="set ${s.done ? 'is-done' : ''} ${i >= r.sets ? 'is-extra' : ''}">
         <span class="set-n">${i + 1}</span>
-        ${item.bw ? '<span class="set-bw">Không tạ</span>' : `<label class="set-f"><input type="number" inputmode="decimal" step="0.5" min="0" data-f="w" ${attrs} id="w-${where}-${item.ex}-${i}" value="${esc(s.w || '')}" placeholder="${esc(prev.w || '')}" aria-label="Hiệp ${i + 1}: mức tạ (kg)"><span>kg</span></label>`}
+        ${item.bw ? '<span class="set-bw">Không tạ</span>' : `<label class="set-f"><input type="number" inputmode="decimal" step="0.5" min="0" data-f="w" ${attrs} id="w-${where}-${item.ex}-${i}" value="${esc(s.w || '')}" placeholder="${esc(prev.w || (r.kg ? r.kg.w : ''))}" aria-label="Hiệp ${i + 1}: mức tạ (kg)"><span>kg</span></label>`}
         <label class="set-f"><input type="number" inputmode="numeric" min="0" data-f="r" ${attrs} id="r-${where}-${item.ex}-${i}" value="${esc(s.r || '')}" placeholder="${esc(prev.r || '')}" aria-label="Hiệp ${i + 1}: số ${unit}"><span>${unit}</span></label>
         <button type="button" class="set-ok" data-act="set-done" ${attrs} aria-pressed="${s.done ? 'true' : 'false'}" aria-label="Xong hiệp ${i + 1}">${ICON.check}</button>
       </div>`;
@@ -325,8 +341,9 @@
     if (item.sets) {
       return `<ul class="rx">
         <li><b>${r.sets}</b> hiệp × <b>${esc(item.reps)}</b></li>
+        ${r.kg ? `<li class="rx-kg"><b>${fmtKg(r.kg.w)} kg</b> ${esc(r.kg.note)}</li>` : item.bw ? '<li>Không tạ</li>' : ''}
         <li>Nghỉ <b>${fmtRest(item.rest)}</b></li>
-        ${r.rir && r.rir !== '—' ? `<li>${/\d/.test(r.rir) ? 'Còn dư <b>' + esc(r.rir) + '</b> lần' : esc(r.rir)}</li>` : ''}
+        ${r.rir && r.rir !== '—' ? `<li>${isRir(r.rir) ? 'Còn dư <b>' + esc(r.rir) + '</b> lần' : esc(r.rir)}</li>` : ''}
       </ul>`;
     }
     return `<ul class="rx"><li><b>${esc(item.dose || '')}</b></li></ul>`;
@@ -518,7 +535,8 @@
           <div class="rxbox">
             <h3>Hôm nay</h3>
             ${r.skip ? `<p class="skipnote">${esc(r.reason)}</p>` : rxChips(item, r)}
-            ${e.load ? `<p class="load"><b>Mức tạ khởi điểm:</b> ${esc(e.load)}</p>` : ''}
+            ${r.kg && !r.skip ? `<p class="load"><b>Tạ tuần này:</b> ${fmtKg(r.kg.w)} kg ${esc(r.kg.note)} · mục tiêu trước giải ${fmtKg(r.kg.goal)} kg. Còn dư hơn 4 lần → tăng 1 nấc; dưới 2 lần → giảm.</p>` : ''}
+            ${e.load ? `<p class="load"><b>Cách chọn tạ:</b> ${esc(e.load)}</p>` : ''}
             ${e.equip ? `<p class="load"><b>Dụng cụ:</b> ${esc(e.equip)}</p>` : ''}
           </div>
 

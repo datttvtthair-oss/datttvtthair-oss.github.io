@@ -262,6 +262,44 @@ window.EXERCISES = {
     alts: [{ id: 'standing-calf-raise' }, { text: 'Ngồi ghế, tạ đơn đặt trên đùi, nhón gót trên bậc' }]
   },
 
+  'lateral-bound': {
+    vi: 'Bật ngang tiếp đất 1 chân', en: 'Lateral Bound (Skater Jump)', photos: true,
+    muscles: 'Mông bên hông, đùi trước, bắp chân — đẩy ngang và tiếp đất một chân, giúp đổi hướng nhanh và an toàn',
+    equip: 'Không cần dụng cụ; sàn phẳng, không trơn',
+    cue: 'Đẩy mạnh sang ngang, tiếp đất êm bằng một chân và đứng yên 1–2 giây',
+    load: 'Chỉ trọng lượng cơ thể. Tuần đầu bật ngắn (khoảng 1 bước rưỡi) để học tiếp đất; đứng vững được rồi mới bật xa dần.',
+    steps: [
+      'Đứng trên chân phải, gối hơi khuỵu, hông đẩy ra sau, chân trái co nhẹ phía sau.',
+      'Đẩy mạnh bằng chân phải, bật ngang sang trái, tay vung theo hướng bật.',
+      'Tiếp đất bằng chân trái: nửa trước bàn chân rồi cả bàn, gối khuỵu và hướng theo mũi chân.',
+      'Đứng vững 1–2 giây, chân phải không chạm sàn.',
+      'Bật ngược lại sang phải. Mỗi lần sang một bên tính là 1 lần.'
+    ],
+    breath: 'Thở ra khi đẩy bật, hít vào khi đứng vững.',
+    mistakes: ['Gối sụp vào trong khi tiếp đất', 'Tiếp đất cứng, gối thẳng', 'Bật quá xa khi chưa đứng vững được', 'Thân đổ nghiêng theo quán tính'],
+    stop: ['Đau gối hoặc cổ chân khi tiếp đất', 'Không giữ được thăng bằng → rút ngắn khoảng bật'],
+    alts: [{ text: 'Bước ngang dài rồi đứng một chân (chưa bật) — học tiếp đất trước' }, { id: 'defensive-slide' }]
+  },
+
+  'nordic-curl': {
+    vi: 'Nordic hamstring có trợ lực', en: 'Assisted Nordic Hamstring Curl', photos: true,
+    muscles: 'Đùi sau (hamstring) — giúp phòng căng rách đùi sau khi chạy nước rút',
+    equip: 'Thảm hoặc đệm gối; chỗ chèn gót (đệm máy móc đùi, thanh đòn có đệm) hoặc người giữ cổ chân',
+    cue: 'Người thẳng từ gối tới đầu, đổ về trước thật chậm, chống tay khi không giữ được nữa',
+    load: 'Không tạ. Tuần đầu chỉ đổ khoảng nửa đường rồi chống tay. Khoẻ hơn thì đổ xa hơn trước khi chống tay.',
+    steps: [
+      'Quỳ trên đệm, gót chân chèn dưới đệm cố định (hoặc nhờ người giữ cổ chân).',
+      'Thân thẳng từ gối tới đầu, siết mông, hai tay để trước ngực.',
+      'Từ từ đổ người về trước trong 3–5 giây, dùng đùi sau "phanh" lại; hông không gập.',
+      'Khi không giữ được nữa, chống hai tay xuống sàn như hít đất.',
+      'Đẩy tay nhẹ và kéo bằng đùi sau để về tư thế quỳ thẳng.'
+    ],
+    breath: 'Thở ra chậm khi đổ người, hít vào khi về.',
+    mistakes: ['Gập hông (chổng mông) thay vì giữ người thẳng', 'Đổ nhanh, rơi tự do', 'Làm nhiều lần ngay tuần đầu — rất dễ đau cơ'],
+    stop: ['Đau nhói ở đùi sau hoặc khoeo → dừng ngay', 'Đau gối khi quỳ → thêm đệm dày'],
+    alts: [{ id: 'lying-leg-curl', why: 'nếu chưa có chỗ chèn gót' }, { text: 'Cầu mông một chân, trượt gót (slider leg curl)' }]
+  },
+
   /* ─────────────────────── THÂN TRÊN ─────────────────────── */
 
   'db-bench-press': {
@@ -609,6 +647,24 @@ window.EXERCISES = {
     alts: [{ id: 'pallof-press' }, { text: 'Plank nghiêng chống gối' }]
   },
 
+  'copenhagen-plank': {
+    vi: 'Copenhagen plank (gối trên ghế)', en: 'Copenhagen Plank (Short Lever)', photos: true,
+    muscles: 'Cơ khép đùi (háng trong), cơ bụng chéo — giúp phòng căng cơ háng khi đổi hướng',
+    equip: 'Ghế băng hoặc bục cao khoảng 40–50 cm, thảm',
+    cue: 'Gối và cẳng chân trên đặt lên ghế, ép chân xuống ghế để nâng hông, người thẳng',
+    load: 'Không tạ. Bắt đầu 10–15 giây mỗi bên, tăng dần lên 20–30 giây. Bản khó hơn: đặt cổ chân (thay vì gối) lên ghế.',
+    steps: [
+      'Nằm nghiêng, khuỷu tay ngay dưới vai, gối và cẳng chân trên đặt lên ghế; chân dưới để dưới ghế.',
+      'Ép chân trên xuống ghế, nâng hông lên đến khi người thẳng từ đầu tới gối.',
+      'Nâng chân dưới lên gần chạm mặt dưới ghế (khó quá thì để chân dưới chạm nhẹ sàn).',
+      'Giữ đủ thời gian rồi hạ hông xuống. Đổi bên.'
+    ],
+    breath: 'Thở đều, chậm, không nín thở.',
+    mistakes: ['Hông võng xuống', 'Ghế quá cao so với sức', 'Nín thở'],
+    stop: ['Đau nhói ở háng hoặc mặt trong gối → dừng, chuyển sang plank nghiêng'],
+    alts: [{ id: 'side-plank' }, { text: 'Nằm ngửa kẹp bóng giữa hai gối, ép giữ 10 giây (adductor squeeze)' }]
+  },
+
   /* ──────────────────── KHỞI ĐỘNG / PHỤC HỒI ──────────────────── */
 
   'gym-warmup': {
@@ -761,6 +817,24 @@ window.EXERCISES = {
     mistakes: ['Nghỉ quá ngắn biến bài tốc độ thành bài mệt', 'Làm khi chưa khởi động', 'Ngửa người khi xuất phát'],
     stop: ['Căng hoặc nhói đùi sau → dừng ngay', 'Tốc độ giảm rõ → dừng'],
     alts: [{ text: 'Chân mệt: 4 lần chạy khoảng 70% sức, hoặc bỏ qua hôm nay' }]
+  },
+
+  'shuttle-run': {
+    vi: 'Chạy con thoi biến tốc', en: 'Shuttle Run Intervals', photos: true, kind: 'drill',
+    muscles: 'Toàn chân, tim phổi — sức bền chạy đi chạy lại như trong trận',
+    equip: 'Sân bóng rổ; 2 mốc cách nhau 10–15 m (vạch sân hoặc nấm)',
+    cue: 'Chạy nhanh, hạ thấp người trước mốc, chạm vạch rồi quay về thật nhanh',
+    load: 'Mỗi lượt khoảng 20 giây chạy hết sức (đi về 2–3 lần), nghỉ 40 giây. Tuần đầu 4 lượt; tốc độ giảm rõ thì dừng.',
+    steps: [
+      'Đặt 2 mốc cách nhau 10–15 m (ví dụ vạch cuối sân và vạch ném phạt).',
+      'Chạy nhanh tới mốc, vài bước cuối hạ thấp người để giảm tốc.',
+      'Chân ngoài chống mạnh, chạm vạch, xoay người và tăng tốc quay về.',
+      'Lặp lại liên tục khoảng 20 giây rồi đi bộ nghỉ 40 giây — đó là 1 lượt.'
+    ],
+    breath: 'Thở mạnh, đều theo nhịp chạy; lúc nghỉ hít sâu bằng mũi, thở ra bằng miệng.',
+    mistakes: ['Quay người khi vẫn chạy nhanh, không hạ thấp', 'Nghỉ quá ngắn rồi chạy chậm dần', 'Làm ngay trước buổi chân nặng'],
+    stop: ['Đau gân gót, ống đồng hoặc gối khi chống', 'Chóng mặt, khó thở bất thường → dừng ngay'],
+    alts: [{ id: 'acceleration' }, { text: 'Đạp xe biến tốc: 20 giây nhanh / 40 giây chậm' }]
   },
 
   'defensive-slide': {
